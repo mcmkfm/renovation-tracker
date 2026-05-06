@@ -1,1 +1,385 @@
-test
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Смета ремонта</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .hidden-section { display: none; }
+        #loader { display: none; }
+        .is-loading #loader { display: flex; }
+        
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans p-4 sm:p-6 min-h-screen relative">
+
+    <div id="loader" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-slate-800 text-white px-6 py-4 rounded-xl shadow-2xl z-[100] items-center gap-3">
+        <svg class="animate-spin h-6 w-6 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span id="loader-text" class="font-medium text-lg tracking-wide">Синхронизация...</span>
+    </div>
+
+    <div class="max-w-6xl mx-auto">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 border-b pb-4 border-slate-200 gap-4">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">Учет расходов на ремонт</h1>
+                <p class="text-sm sm:text-base text-slate-500 mt-1">Синхронизация через JSONBin</p>
+            </div>
+            <div class="text-left md:text-right w-full md:w-auto bg-white md:bg-transparent p-4 md:p-0 rounded-xl md:rounded-none shadow-sm md:shadow-none border md:border-none border-slate-200">
+                <p class="text-xs sm:text-sm text-slate-500 uppercase tracking-wide font-semibold mb-1">Оплачено (Осталось):</p>
+                <p class="text-2xl sm:text-3xl font-bold text-indigo-600 truncate">
+                    <span id="grand-total-paid">0</span> ₽ 
+                    <span class="text-lg sm:text-xl text-slate-400 font-medium whitespace-nowrap">(<span id="grand-total-unpaid">0</span> ₽)</span>
+                </p>
+            </div>
+        </header>
+
+        <div class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 mb-6">
+            <button onclick="toggleSection('categories-section')" class="w-full sm:w-auto bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-4 py-3 sm:py-2 rounded-lg font-medium transition shadow-sm text-center">
+                📁 Категории
+            </button>
+            <button onclick="toggleSection('expenses-section')" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 sm:py-2 rounded-lg font-medium transition shadow-sm text-center">
+                ➕ Добавить расход
+            </button>
+            <button onclick="toggleChart()" class="w-full sm:w-auto bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-4 py-3 sm:py-2 rounded-lg font-medium transition shadow-sm text-center">
+                📊 График
+            </button>
+            <button onclick="loadData()" class="w-full sm:w-auto bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-3 sm:py-2 rounded-lg font-medium transition shadow-sm sm:ml-auto text-center mt-2 sm:mt-0">
+                🔄 Обновить данные
+            </button>
+        </div>
+
+        <div id="categories-section" class="hidden-section bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 mb-6">
+            <h2 class="text-lg sm:text-xl font-bold mb-4">Категории расходов</h2>
+            <form id="category-form" class="flex flex-col sm:flex-row gap-3 mb-6">
+                <input type="text" id="new-category-name" required placeholder="Название новой категории" class="flex-grow border border-slate-300 rounded-lg px-4 py-3 sm:py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <button type="submit" class="bg-slate-800 text-white px-6 py-3 sm:py-2 rounded-lg hover:bg-slate-700 transition">Добавить</button>
+            </form>
+            <ul id="categories-list" class="divide-y divide-slate-200 bg-slate-50 rounded-lg border border-slate-200"></ul>
+        </div>
+
+        <div id="expenses-section" class="hidden-section bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 mb-6">
+            <h2 class="text-lg sm:text-xl font-bold mb-4">Новая статья расходов</h2>
+            <form id="expense-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="col-span-1 sm:col-span-2 flex flex-col">
+                    <label class="text-sm font-semibold text-slate-600 mb-1">Название *</label>
+                    <input type="text" id="exp-name" required class="border border-slate-300 rounded-lg px-3 py-3 sm:py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-sm font-semibold text-slate-600 mb-1">Категория *</label>
+                    <select id="exp-category" required class="border border-slate-300 rounded-lg px-3 py-3 sm:py-2 bg-white"></select>
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-sm font-semibold text-slate-600 mb-1">Стоимость *</label>
+                    <input type="number" id="exp-cost" required step="0.01" min="0" class="border border-slate-300 rounded-lg px-3 py-3 sm:py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-sm font-semibold text-slate-600 mb-1">Множитель (кол-во / метры)</label>
+                    <input type="number" id="exp-multiplier" step="0.01" min="0" placeholder="Пусто, если 1" class="border border-slate-300 rounded-lg px-3 py-3 sm:py-2">
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-sm font-semibold text-slate-600 mb-1">Ссылка на товар</label>
+                    <input type="url" id="exp-link" placeholder="https://..." class="border border-slate-300 rounded-lg px-3 py-3 sm:py-2">
+                </div>
+                <div class="col-span-1 sm:col-span-2 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 mt-2">
+                    <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-3 sm:p-0 rounded-lg border border-slate-200 sm:border-none sm:bg-transparent">
+                        <input type="checkbox" id="exp-priority" class="w-5 h-5 text-indigo-600 rounded">
+                        <span class="text-slate-700 font-medium text-sm">🔥 Высокий приоритет</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-3 sm:p-0 rounded-lg border border-slate-200 sm:border-none sm:bg-transparent">
+                        <input type="checkbox" id="exp-paid" class="w-5 h-5 text-emerald-600 rounded">
+                        <span class="text-slate-700 font-medium text-sm">✅ Оплата проведена</span>
+                    </label>
+                </div>
+                <div class="col-span-1 sm:col-span-2 mt-4">
+                    <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition shadow-md">Сохранить расход</button>
+                </div>
+            </form>
+        </div>
+
+        <div id="chart-section" class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 mb-6 flex-col items-center hidden">
+            <h2 class="text-lg sm:text-xl font-bold mb-4 w-full text-left">Распределение по категориям</h2>
+            <div class="w-full max-w-xs sm:max-w-sm"><canvas id="expenseChart"></canvas></div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-12">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[700px]">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-600 text-xs sm:text-sm uppercase tracking-wider">
+                            <th class="p-3 sm:p-4 font-semibold">Название</th>
+                            <th class="p-3 sm:p-4 font-semibold text-center">Ссылка</th>
+                            <th class="p-3 sm:p-4 font-semibold">Цена</th>
+                            <th class="p-3 sm:p-4 font-semibold text-center">Множитель</th>
+                            <th class="p-3 sm:p-4 font-semibold">Итого</th>
+                            <th class="p-3 sm:p-4 font-semibold text-center">Приоритет</th>
+                            <th class="p-3 sm:p-4 font-semibold text-center">Статус</th>
+                            <th class="p-3 sm:p-4 font-semibold text-right">Удалить</th>
+                        </tr>
+                    </thead>
+                    <tbody id="expenses-table-body" class="divide-y divide-slate-200 text-slate-800 text-sm"></tbody>
+                </table>
+            </div>
+            <div id="empty-state" class="text-center py-12 text-slate-500 hidden">Расходов пока нет. Добавьте первую запись!</div>
+        </div>
+    </div>
+
+    <script>
+        // Вставь сюда свои ключи!
+        const BIN_ID = 'ВСТАВЬ_СЮДА_СВОЙ_BIN_ID'; 
+        const API_KEY = 'ВСТАВЬ_СЮДА_СВОЙ_API_KEY';
+        const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+
+        let state = { categories: [], expenses: [] };
+        let chartInstance = null;
+        let isChartVisible = false; 
+        
+        // Храним ID расхода и поле, которое сейчас редактируется ('name', 'link', 'cost', 'multiplier', 'paid')
+        let editState = { id: null, field: null }; 
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('category-form').addEventListener('submit', addCategory);
+            document.getElementById('expense-form').addEventListener('submit', addExpense);
+            loadData();
+        });
+
+        function setLoader(isLoading, text = 'Синхронизация...') {
+            document.getElementById('loader-text').textContent = text;
+            document.body.classList.toggle('is-loading', isLoading);
+        }
+
+        async function loadData() {
+            if (BIN_ID.includes('ВСТАВЬ')) { alert('Сначала настрой BIN_ID и API_KEY в коде!'); return; }
+            setLoader(true, 'Загрузка данных...');
+            try {
+                const response = await fetch(`${API_URL}/latest`, { headers: { 'X-Master-Key': API_KEY } });
+                if (!response.ok) throw new Error('Ошибка сети');
+                state = (await response.json()).record;
+                updateUI(false); 
+            } catch (error) {
+                console.error(error); alert('Не удалось загрузить данные.');
+            } finally {
+                setLoader(false);
+            }
+        }
+
+        async function saveData() {
+            setLoader(true, 'Сохранение...');
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
+                    body: JSON.stringify(state)
+                });
+                if (!response.ok) throw new Error('Ошибка сети при сохранении');
+            } catch (error) {
+                console.error(error); alert('Не удалось сохранить данные!');
+            } finally {
+                setLoader(false);
+            }
+        }
+
+        function toggleSection(sectionId) { document.getElementById(sectionId).classList.toggle('hidden-section'); }
+        function toggleChart() { isChartVisible = !isChartVisible; renderChart(); }
+        function updateUI(triggerSave = false) { renderCategories(); renderCategorySelect(); renderExpensesTable(); renderChart(); if (triggerSave) saveData(); }
+
+        async function addCategory(e) {
+            e.preventDefault();
+            const input = document.getElementById('new-category-name');
+            const newCat = input.value.trim();
+            if (!newCat || state.categories.some(c => c.toLowerCase() === newCat.toLowerCase())) return;
+            state.categories.push(newCat);
+            input.value = '';
+            updateUI(true);
+        }
+
+        async function deleteCategory(catName) {
+            if(confirm(`Удалить категорию "${catName}"? Связанные расходы будут перемещены в "Без категории".`)) {
+                state.categories = state.categories.filter(c => c !== catName);
+                state.expenses.forEach(exp => { if (exp.category === catName) exp.category = "Без категории"; });
+                if(!state.categories.includes("Без категории") && state.expenses.some(e => e.category === "Без категории")) state.categories.push("Без категории");
+                updateUI(true);
+            }
+        }
+
+        async function addExpense(e) {
+            e.preventDefault();
+            const multStr = document.getElementById('exp-multiplier').value;
+            state.expenses.push({
+                id: Date.now().toString(),
+                name: document.getElementById('exp-name').value.trim(),
+                category: document.getElementById('exp-category').value,
+                cost: parseFloat(document.getElementById('exp-cost').value),
+                multiplier: multStr ? parseFloat(multStr) : null,
+                link: document.getElementById('exp-link').value.trim(),
+                priority: document.getElementById('exp-priority').checked,
+                paid: document.getElementById('exp-paid').checked
+            });
+            document.getElementById('expense-form').reset();
+            updateUI(true);
+        }
+
+        async function deleteExpense(id) {
+            if(confirm('Точно удалить этот расход?')) {
+                state.expenses = state.expenses.filter(e => e.id !== id);
+                updateUI(true);
+            }
+        }
+
+        // --- УНИВЕРСАЛЬНОЕ РЕДАКТИРОВАНИЕ ПОЛЕЙ ---
+        function startEdit(id, field) {
+            editState = { id, field };
+            updateUI(false);
+        }
+
+        function cancelEdit() {
+            editState = { id: null, field: null };
+            updateUI(false);
+        }
+
+        function saveEdit(id, field) {
+            const expIndex = state.expenses.findIndex(e => e.id === id);
+            if (expIndex === -1) return cancelEdit();
+            const exp = state.expenses[expIndex];
+
+            if (field === 'name') {
+                const val = document.getElementById(`edit-name-${id}`).value.trim();
+                if (!val) { alert('Название не может быть пустым'); return; }
+                exp.name = val;
+            } else if (field === 'link') {
+                exp.link = document.getElementById(`edit-link-${id}`).value.trim();
+            } else if (field === 'cost') {
+                const val = parseFloat(document.getElementById(`edit-cost-${id}`).value);
+                if (isNaN(val) || val < 0) { alert('Некорректная цена'); return; }
+                exp.cost = val;
+            } else if (field === 'multiplier') {
+                const valStr = document.getElementById(`edit-multiplier-${id}`).value;
+                exp.multiplier = valStr ? parseFloat(valStr) : null;
+            } else if (field === 'paid') {
+                exp.paid = document.getElementById(`edit-paid-${id}`).checked;
+            }
+
+            editState = { id: null, field: null };
+            updateUI(true); 
+        }
+
+        // --- РЕНДЕР ---
+        function renderCategories() {
+            document.getElementById('categories-list').innerHTML = state.categories.map(cat => `
+                <li class="flex flex-col sm:flex-row justify-between sm:items-center p-3 sm:p-4 hover:bg-slate-100 transition gap-2">
+                    <span class="font-medium truncate">${cat}</span>
+                    <button type="button" onclick="deleteCategory('${cat}')" class="text-red-500 hover:text-red-700 text-sm font-semibold self-start sm:self-auto bg-red-50 sm:bg-transparent px-2 py-1 sm:p-0 rounded">Удалить</button>
+                </li>
+            `).join('');
+        }
+
+        function renderCategorySelect() {
+            document.getElementById('exp-category').innerHTML = state.categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+        }
+
+        function renderExpensesTable() {
+            const tbody = document.getElementById('expenses-table-body');
+            document.getElementById('empty-state').classList.toggle('hidden', state.expenses.length > 0);
+            tbody.innerHTML = '';
+            
+            let totalPaid = 0, totalUnpaid = 0;
+            const grouped = {};
+            state.categories.forEach(c => grouped[c] = []); 
+            state.expenses.forEach(exp => {
+                if (!grouped[exp.category]) { grouped[exp.category] = []; state.categories.push(exp.category); }
+                grouped[exp.category].push(exp);
+            });
+
+            state.categories.forEach(cat => {
+                if (!grouped[cat] || grouped[cat].length === 0) return;
+                tbody.innerHTML += `<tr class="bg-indigo-50"><td colspan="8" class="p-3 sm:p-4 font-bold text-indigo-900">${cat}</td></tr>`;
+
+                grouped[cat].forEach(exp => {
+                    const totalRowCost = exp.cost * (exp.multiplier || 1);
+                    exp.paid ? (totalPaid += totalRowCost) : (totalUnpaid += totalRowCost);
+
+                    // 1. Название
+                    let nameHtml = editState.id === exp.id && editState.field === 'name' 
+                        ? `<div class="flex items-center gap-1"><input type="text" id="edit-name-${exp.id}" value="${exp.name.replace(/"/g, '&quot;')}" class="w-full sm:w-32 border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none"><button onclick="saveEdit('${exp.id}', 'name')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`
+                        : `<div onclick="startEdit('${exp.id}', 'name')" class="cursor-pointer group flex items-center gap-2 hover:bg-indigo-50 p-1 -ml-1 rounded transition"><span class="border-b border-dashed border-slate-400 group-hover:border-indigo-600">${exp.name}</span><span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
+
+                    // 2. Ссылка
+                    let linkHtml;
+                    if (editState.id === exp.id && editState.field === 'link') {
+                        linkHtml = `<div class="flex items-center gap-1 justify-center"><input type="url" id="edit-link-${exp.id}" value="${exp.link ? exp.link.replace(/"/g, '&quot;') : ''}" placeholder="https://" class="w-24 border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none"><button onclick="saveEdit('${exp.id}', 'link')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`;
+                    } else {
+                        const linkBadge = exp.link ? `<a href="${exp.link}" target="_blank" onclick="event.stopPropagation()" class="text-blue-500 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-full text-xs font-semibold">🔗</a>` : `<span class="text-slate-300">—</span>`;
+                        linkHtml = `<div onclick="startEdit('${exp.id}', 'link')" class="cursor-pointer group flex items-center justify-center gap-1 hover:bg-indigo-50 p-1 rounded transition">${linkBadge}<span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
+                    }
+
+                    // 3. Цена
+                    let costHtml = editState.id === exp.id && editState.field === 'cost'
+                        ? `<div class="flex items-center gap-1"><input type="number" id="edit-cost-${exp.id}" value="${exp.cost}" step="0.01" min="0" class="w-20 sm:w-24 border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none"><button onclick="saveEdit('${exp.id}', 'cost')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`
+                        : `<div onclick="startEdit('${exp.id}', 'cost')" class="cursor-pointer group flex items-center gap-2 hover:bg-indigo-50 p-1 -ml-1 rounded transition"><span class="border-b border-dashed border-slate-400 group-hover:border-indigo-600 group-hover:text-indigo-600">${exp.cost.toLocaleString('ru-RU')} ₽</span><span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
+
+                    // 4. Множитель
+                    let multHtml = editState.id === exp.id && editState.field === 'multiplier'
+                        ? `<div class="flex items-center justify-center gap-1"><input type="number" id="edit-multiplier-${exp.id}" value="${exp.multiplier || ''}" step="0.01" min="0" class="w-16 border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none"><button onclick="saveEdit('${exp.id}', 'multiplier')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`
+                        : `<div onclick="startEdit('${exp.id}', 'multiplier')" class="cursor-pointer group flex items-center justify-center gap-1 hover:bg-indigo-50 p-1 rounded transition"><span class="border-b border-dashed border-slate-400 group-hover:border-indigo-600 text-slate-500">${exp.multiplier ? `x${exp.multiplier}` : '—'}</span><span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
+
+                    // 5. Статус оплаты
+                    let paidHtml;
+                    if (editState.id === exp.id && editState.field === 'paid') {
+                        paidHtml = `<div class="flex items-center justify-center gap-2 bg-white border border-indigo-200 p-1 rounded"><input type="checkbox" id="edit-paid-${exp.id}" ${exp.paid ? 'checked' : ''} class="w-4 h-4 text-indigo-600 rounded"><button onclick="saveEdit('${exp.id}', 'paid')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`;
+                    } else {
+                        const paidBadge = exp.paid ? '<span class="text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-1 rounded-full border-b border-dashed border-emerald-400">Оплачено</span>' : '<span class="text-slate-400 text-xs border-b border-dashed border-slate-300">В плане</span>';
+                        paidHtml = `<div onclick="startEdit('${exp.id}', 'paid')" class="cursor-pointer group flex items-center justify-center gap-1 hover:bg-indigo-50 p-1 rounded transition">${paidBadge}<span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
+                    }
+
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-50 border-y border-slate-100 transition-colors">
+                            <td class="p-3 sm:p-4">${nameHtml}</td>
+                            <td class="p-3 sm:p-4 text-center">${linkHtml}</td>
+                            <td class="p-3 sm:p-4 whitespace-nowrap">${costHtml}</td>
+                            <td class="p-3 sm:p-4 text-center">${multHtml}</td>
+                            <td class="p-3 sm:p-4 font-bold whitespace-nowrap">${totalRowCost.toLocaleString('ru-RU')} ₽</td>
+                            <td class="p-3 sm:p-4 text-center">${exp.priority ? '<span title="Высокий приоритет">🔥</span>' : ''}</td>
+                            <td class="p-3 sm:p-4 text-center">${paidHtml}</td>
+                            <td class="p-3 sm:p-4 text-right">
+                                <button onclick="deleteExpense('${exp.id}')" class="text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition" title="Удалить">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            });
+            document.getElementById('grand-total-paid').textContent = totalPaid.toLocaleString('ru-RU');
+            document.getElementById('grand-total-unpaid').textContent = totalUnpaid.toLocaleString('ru-RU');
+        }
+
+        function renderChart() {
+            const section = document.getElementById('chart-section');
+            if (!isChartVisible || state.expenses.length === 0) { 
+                section.classList.add('hidden'); section.classList.remove('flex'); return; 
+            }
+            section.classList.remove('hidden'); section.classList.add('flex');
+            const categoryTotals = {};
+            state.expenses.forEach(exp => { categoryTotals[exp.category] = (categoryTotals[exp.category] || 0) + (exp.cost * (exp.multiplier || 1)); });
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(document.getElementById('expenseChart').getContext('2d'), {
+                type: 'doughnut',
+                data: { labels: Object.keys(categoryTotals), datasets: [{ data: Object.values(categoryTotals), backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316', '#84cc16', '#14b8a6'] }] },
+                options: { responsive: true, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15 } } } }
+            });
+        }
+    </script>
+</body>
+</html>
