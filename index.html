@@ -19,6 +19,12 @@
         input[type="number"] {
             -moz-appearance: textfield;
         }
+
+        /* Кастомный скроллбар для списка фильтров */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; rounded-lg; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans p-4 sm:p-6 min-h-screen relative">
@@ -31,7 +37,7 @@
         <span id="loader-text" class="font-medium text-lg tracking-wide">Синхронизация...</span>
     </div>
 
-    <div class="max-w-6xl mx-auto">
+    <div class="max-w-[96%] xl:max-w-[1400px] mx-auto">
         <header class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 border-b pb-4 border-slate-200 gap-4">
             <div>
                 <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">Учет расходов на ремонт</h1>
@@ -54,7 +60,7 @@
                 ➕ Добавить расход
             </button>
             <button onclick="toggleChart()" class="w-full sm:w-auto bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-4 py-3 sm:py-2 rounded-lg font-medium transition shadow-sm text-center">
-                📊 График
+                📊 Графики и Фильтры
             </button>
             <button onclick="loadData()" class="w-full sm:w-auto bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-3 sm:py-2 rounded-lg font-medium transition shadow-sm sm:ml-auto text-center mt-2 sm:mt-0">
                 🔄 Обновить данные
@@ -70,63 +76,87 @@
             <ul id="categories-list" class="divide-y divide-slate-200 bg-slate-50 rounded-lg border border-slate-200"></ul>
         </div>
 
-        <div id="expenses-section" class="hidden-section bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 mb-6">
+        <div id="expenses-section" class="hidden-section bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 mb-6 overflow-visible">
             <h2 class="text-lg sm:text-xl font-bold mb-4">Новая статья расходов</h2>
-            <form id="expense-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="col-span-1 sm:col-span-2 flex flex-col">
+            <form id="expense-form" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="col-span-1 md:col-span-2 flex flex-col">
                     <label class="text-sm font-semibold text-slate-600 mb-1">Название *</label>
-                    <input type="text" id="exp-name" required class="border border-slate-300 rounded-lg px-3 py-3 sm:py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <input type="text" id="exp-name" required class="border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
-                <div class="flex flex-col">
+                <div class="col-span-1 flex flex-col">
                     <label class="text-sm font-semibold text-slate-600 mb-1">Категория *</label>
-                    <select id="exp-category" required class="border border-slate-300 rounded-lg px-3 py-3 sm:py-2 bg-white"></select>
+                    <select id="exp-category" required class="border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500"></select>
                 </div>
-                <div class="flex flex-col">
+                
+                <div class="col-span-1 flex flex-col relative">
+                    <label class="text-sm font-semibold text-slate-600 mb-1">Метки (через запятую)</label>
+                    <div class="flex flex-wrap gap-1 mb-1" id="form-tags-container"></div>
+                    <input type="text" id="exp-tags-input" autocomplete="off" placeholder="Например: кухня, сантехника" class="border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <div id="form-tags-suggestions" class="absolute top-full left-0 mt-1 w-full bg-white border border-slate-200 shadow-lg rounded-lg z-50 hidden max-h-40 overflow-y-auto custom-scrollbar"></div>
+                </div>
+
+                <div class="col-span-1 flex flex-col">
                     <label class="text-sm font-semibold text-slate-600 mb-1">Стоимость *</label>
-                    <input type="number" id="exp-cost" required step="0.01" min="0" class="border border-slate-300 rounded-lg px-3 py-3 sm:py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <input type="number" id="exp-cost" required step="0.01" min="0" class="border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
-                <div class="flex flex-col">
-                    <label class="text-sm font-semibold text-slate-600 mb-1">Множитель (кол-во / метры)</label>
-                    <input type="number" id="exp-multiplier" step="0.01" min="0" placeholder="Пусто, если 1" class="border border-slate-300 rounded-lg px-3 py-3 sm:py-2">
-                </div>
-                <div class="flex flex-col">
+                
+                <div class="col-span-1 flex flex-col">
                     <label class="text-sm font-semibold text-slate-600 mb-1">Ссылка на товар</label>
-                    <input type="url" id="exp-link" placeholder="https://..." class="border border-slate-300 rounded-lg px-3 py-3 sm:py-2">
+                    <input type="url" id="exp-link" placeholder="https://..." class="border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </div>
-                <div class="col-span-1 sm:col-span-2 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 mt-2">
-                    <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-3 sm:p-0 rounded-lg border border-slate-200 sm:border-none sm:bg-transparent">
+
+                <div class="col-span-1 md:col-span-3 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 mt-2">
+                    <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 sm:p-0 rounded-lg border border-slate-200 sm:border-none sm:bg-transparent">
                         <input type="checkbox" id="exp-priority" class="w-5 h-5 text-indigo-600 rounded">
                         <span class="text-slate-700 font-medium text-sm">🔥 Высокий приоритет</span>
                     </label>
-                    <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-3 sm:p-0 rounded-lg border border-slate-200 sm:border-none sm:bg-transparent">
+                    <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 sm:p-0 rounded-lg border border-slate-200 sm:border-none sm:bg-transparent">
                         <input type="checkbox" id="exp-paid" class="w-5 h-5 text-emerald-600 rounded">
                         <span class="text-slate-700 font-medium text-sm">✅ Оплата проведена</span>
                     </label>
                 </div>
-                <div class="col-span-1 sm:col-span-2 mt-4">
+                <div class="col-span-1 md:col-span-3 mt-2">
                     <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition shadow-md">Сохранить расход</button>
                 </div>
             </form>
         </div>
 
-        <div id="chart-section" class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 mb-6 flex-col items-center hidden">
-            <h2 class="text-lg sm:text-xl font-bold mb-4 w-full text-left">Распределение по категориям</h2>
-            <div class="w-full max-w-xs sm:max-w-sm"><canvas id="expenseChart"></canvas></div>
+        <div id="chart-section" class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 mb-6 hidden">
+            <h2 class="text-lg sm:text-xl font-bold mb-6">Аналитика</h2>
+            <div class="flex flex-col lg:flex-row gap-8 w-full">
+                <div class="w-full lg:w-2/3 max-w-md mx-auto flex items-center justify-center relative min-h-[300px]">
+                    <canvas id="expenseChart"></canvas>
+                </div>
+                
+                <div class="w-full lg:w-1/3 flex flex-col border-t lg:border-t-0 lg:border-l border-slate-200 pt-6 lg:pt-0 lg:pl-6">
+                    <div class="flex gap-4 mb-4 border-b border-slate-200">
+                        <button id="tab-btn-categories" onclick="switchChartTab('categories')" class="px-2 py-2 font-bold text-indigo-600 border-b-2 border-indigo-600 transition">По категориям</button>
+                        <button id="tab-btn-tags" onclick="switchChartTab('tags')" class="px-2 py-2 font-medium text-slate-500 hover:text-slate-800 transition">По меткам</button>
+                    </div>
+                    
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Отображать:</span>
+                        <button onclick="toggleAllFilters()" class="text-xs text-indigo-500 hover:text-indigo-700 underline">Переключить все</button>
+                    </div>
+                    <div id="chart-filters-list" class="flex flex-col gap-2 overflow-y-auto max-h-64 custom-scrollbar pr-2">
+                        </div>
+                </div>
+            </div>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-12">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse min-w-[700px]">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-visible mb-12">
+            <div class="overflow-x-auto overflow-y-visible">
+                <table class="w-full text-left border-collapse min-w-[900px]">
                     <thead>
                         <tr class="bg-slate-100 text-slate-600 text-xs sm:text-sm uppercase tracking-wider">
-                            <th class="p-3 sm:p-4 font-semibold">Название</th>
-                            <th class="p-3 sm:p-4 font-semibold text-center">Ссылка</th>
-                            <th class="p-3 sm:p-4 font-semibold">Цена</th>
-                            <th class="p-3 sm:p-4 font-semibold text-center">Множитель</th>
-                            <th class="p-3 sm:p-4 font-semibold">Итого</th>
-                            <th class="p-3 sm:p-4 font-semibold text-center">Приоритет</th>
-                            <th class="p-3 sm:p-4 font-semibold text-center">Статус</th>
-                            <th class="p-3 sm:p-4 font-semibold text-right">Удалить</th>
+                            <th class="p-3 font-semibold w-1/4">Название</th>
+                            <th class="p-3 font-semibold text-center w-16">Ссылка</th>
+                            <th class="p-3 font-semibold w-32">Цена</th>
+                            <th class="p-3 font-semibold w-48">Метки</th>
+                            <th class="p-3 font-semibold text-center w-24">Приоритет</th>
+                            <th class="p-3 font-semibold text-center w-28">Статус</th>
+                            <th class="p-3 font-semibold text-center w-24">Заметка</th>
+                            <th class="p-3 font-semibold text-right w-16">Действия</th>
                         </tr>
                     </thead>
                     <tbody id="expenses-table-body" class="divide-y divide-slate-200 text-slate-800 text-sm"></tbody>
@@ -137,21 +167,33 @@
     </div>
 
     <script>
-        // Вставь сюда свои ключи!
-        const BIN_ID = 'ВСТАВЬ_СЮДА_СВОЙ_BIN_ID'; 
-        const API_KEY = 'ВСТАВЬ_СЮДА_СВОЙ_API_KEY';
+        // --- НАСТРОЙКИ JSONBIN ---
+
+        const BIN_ID = '69beb233aa77b81da90633e6'; 
+        const API_KEY = '$2a$10$S98/2wp40ia3C1CzsHd6euLAUhjtow7BzBS57fF3XRrcDnUxw2FpG';
+
         const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
-        let state = { categories: [], expenses: [] };
+        let state = { categories: [], tags: [], expenses: [] };
         let chartInstance = null;
         let isChartVisible = false; 
         
-        // Храним ID расхода и поле, которое сейчас редактируется ('name', 'link', 'cost', 'multiplier', 'paid')
         let editState = { id: null, field: null }; 
+        let expandedNotes = new Set(); // ID расходов, у которых открыта заметка
+        
+        // Переменные для формы добавления меток
+        let currentFormTags = [];
+
+        // Состояние графика
+        let chartState = {
+            activeTab: 'categories', // 'categories' | 'tags'
+            filters: new Set() // Активные фильтры (названия категорий или меток)
+        };
 
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('category-form').addEventListener('submit', addCategory);
             document.getElementById('expense-form').addEventListener('submit', addExpense);
+            setupTagInputLogic();
             loadData();
         });
 
@@ -166,7 +208,18 @@
             try {
                 const response = await fetch(`${API_URL}/latest`, { headers: { 'X-Master-Key': API_KEY } });
                 if (!response.ok) throw new Error('Ошибка сети');
-                state = (await response.json()).record;
+                const data = (await response.json()).record;
+                
+                // Миграция старых данных (если не было tags/notes)
+                state.categories = data.categories || [];
+                state.tags = data.tags || [];
+                state.expenses = (data.expenses || []).map(exp => ({
+                    ...exp,
+                    tags: exp.tags || [],
+                    notes: exp.notes || ''
+                }));
+                
+                initChartFilters();
                 updateUI(false); 
             } catch (error) {
                 console.error(error); alert('Не удалось загрузить данные.');
@@ -192,15 +245,108 @@
         }
 
         function toggleSection(sectionId) { document.getElementById(sectionId).classList.toggle('hidden-section'); }
-        function toggleChart() { isChartVisible = !isChartVisible; renderChart(); }
-        function updateUI(triggerSave = false) { renderCategories(); renderCategorySelect(); renderExpensesTable(); renderChart(); if (triggerSave) saveData(); }
+        function toggleChart() { 
+            isChartVisible = !isChartVisible; 
+            const section = document.getElementById('chart-section');
+            if(isChartVisible) {
+                section.classList.remove('hidden');
+                section.classList.add('block');
+                renderChart();
+            } else {
+                section.classList.add('hidden');
+                section.classList.remove('block');
+            }
+        }
+        
+        function updateUI(triggerSave = false) { 
+            renderCategories(); 
+            renderCategorySelect(); 
+            renderExpensesTable(); 
+            if(isChartVisible) renderChart(); 
+            if (triggerSave) saveData(); 
+        }
 
+        // --- ЛОГИКА ФОРМЫ ТЕГОВ ---
+        function setupTagInputLogic() {
+            const input = document.getElementById('exp-tags-input');
+            const suggestionsEl = document.getElementById('form-tags-suggestions');
+
+            input.addEventListener('input', (e) => {
+                const val = e.target.value;
+                if(val.includes(',')) {
+                    const newTags = val.split(',').map(t => t.trim()).filter(t => t);
+                    newTags.forEach(t => { if(!currentFormTags.includes(t)) currentFormTags.push(t); });
+                    e.target.value = '';
+                    renderFormTags();
+                    suggestionsEl.classList.add('hidden');
+                    return;
+                }
+
+                const query = val.trim().toLowerCase();
+                if(query.length > 0) {
+                    const matches = state.tags.filter(t => t.toLowerCase().includes(query) && !currentFormTags.includes(t));
+                    if(matches.length > 0) {
+                        suggestionsEl.innerHTML = matches.map(m => `<div onclick="addTagToForm('${m.replace(/'/g, "\\'")}')" class="p-2 hover:bg-indigo-50 cursor-pointer text-sm border-b border-slate-100">${m}</div>`).join('');
+                        suggestionsEl.classList.remove('hidden');
+                    } else {
+                        suggestionsEl.classList.add('hidden');
+                    }
+                } else {
+                    suggestionsEl.classList.add('hidden');
+                }
+            });
+
+            input.addEventListener('keydown', (e) => {
+                if(e.key === 'Enter') {
+                    e.preventDefault();
+                    const val = e.target.value.trim();
+                    if(val && !currentFormTags.includes(val)) {
+                        currentFormTags.push(val);
+                    }
+                    e.target.value = '';
+                    renderFormTags();
+                    suggestionsEl.classList.add('hidden');
+                }
+            });
+
+            // Скрытие саджестов при клике вне
+            document.addEventListener('click', (e) => {
+                if(!input.contains(e.target) && !suggestionsEl.contains(e.target)) {
+                    suggestionsEl.classList.add('hidden');
+                }
+            });
+        }
+
+        function addTagToForm(tag) {
+            if(!currentFormTags.includes(tag)) currentFormTags.push(tag);
+            document.getElementById('exp-tags-input').value = '';
+            document.getElementById('form-tags-suggestions').classList.add('hidden');
+            renderFormTags();
+            document.getElementById('exp-tags-input').focus();
+        }
+
+        function removeTagFromForm(tag) {
+            currentFormTags = currentFormTags.filter(t => t !== tag);
+            renderFormTags();
+        }
+
+        function renderFormTags() {
+            const container = document.getElementById('form-tags-container');
+            container.innerHTML = currentFormTags.map(t => `
+                <span class="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2 py-1 rounded flex items-center gap-1">
+                    ${t} <button type="button" onclick="removeTagFromForm('${t.replace(/'/g, "\\'")}')" class="text-indigo-500 hover:text-indigo-700 font-bold ml-1">✕</button>
+                </span>
+            `).join('');
+        }
+
+        // --- ЛОГИКА ДОБАВЛЕНИЯ/УДАЛЕНИЯ ДАННЫХ ---
         async function addCategory(e) {
             e.preventDefault();
             const input = document.getElementById('new-category-name');
             const newCat = input.value.trim();
             if (!newCat || state.categories.some(c => c.toLowerCase() === newCat.toLowerCase())) return;
             state.categories.push(newCat);
+            chartState.filters.add(newCat);
             input.value = '';
             updateUI(true);
         }
@@ -210,24 +356,36 @@
                 state.categories = state.categories.filter(c => c !== catName);
                 state.expenses.forEach(exp => { if (exp.category === catName) exp.category = "Без категории"; });
                 if(!state.categories.includes("Без категории") && state.expenses.some(e => e.category === "Без категории")) state.categories.push("Без категории");
+                chartState.filters.delete(catName);
                 updateUI(true);
             }
         }
 
         async function addExpense(e) {
             e.preventDefault();
-            const multStr = document.getElementById('exp-multiplier').value;
+            // Добавляем новые теги из формы в глобальный state.tags
+            currentFormTags.forEach(t => {
+                if(!state.tags.includes(t)) {
+                    state.tags.push(t);
+                    chartState.filters.add(t); // Сразу включаем в фильтры
+                }
+            });
+
             state.expenses.push({
                 id: Date.now().toString(),
                 name: document.getElementById('exp-name').value.trim(),
                 category: document.getElementById('exp-category').value,
                 cost: parseFloat(document.getElementById('exp-cost').value),
-                multiplier: multStr ? parseFloat(multStr) : null,
                 link: document.getElementById('exp-link').value.trim(),
                 priority: document.getElementById('exp-priority').checked,
-                paid: document.getElementById('exp-paid').checked
+                paid: document.getElementById('exp-paid').checked,
+                tags: [...currentFormTags],
+                notes: ''
             });
+
             document.getElementById('expense-form').reset();
+            currentFormTags = [];
+            renderFormTags();
             updateUI(true);
         }
 
@@ -239,15 +397,8 @@
         }
 
         // --- УНИВЕРСАЛЬНОЕ РЕДАКТИРОВАНИЕ ПОЛЕЙ ---
-        function startEdit(id, field) {
-            editState = { id, field };
-            updateUI(false);
-        }
-
-        function cancelEdit() {
-            editState = { id: null, field: null };
-            updateUI(false);
-        }
+        function startEdit(id, field) { editState = { id, field }; updateUI(false); }
+        function cancelEdit() { editState = { id: null, field: null }; updateUI(false); }
 
         function saveEdit(id, field) {
             const expIndex = state.expenses.findIndex(e => e.id === id);
@@ -264,23 +415,161 @@
                 const val = parseFloat(document.getElementById(`edit-cost-${id}`).value);
                 if (isNaN(val) || val < 0) { alert('Некорректная цена'); return; }
                 exp.cost = val;
-            } else if (field === 'multiplier') {
-                const valStr = document.getElementById(`edit-multiplier-${id}`).value;
-                exp.multiplier = valStr ? parseFloat(valStr) : null;
+            } else if (field === 'priority') {
+                exp.priority = document.getElementById(`edit-priority-${id}`).checked;
             } else if (field === 'paid') {
                 exp.paid = document.getElementById(`edit-paid-${id}`).checked;
+            } else if (field === 'tags') {
+                const val = document.getElementById(`edit-tags-${id}`).value;
+                const newTags = val.split(',').map(t => t.trim()).filter(t => t);
+                exp.tags = [...new Set(newTags)];
+                // Обновляем глобальный справочник тегов
+                exp.tags.forEach(t => {
+                    if(!state.tags.includes(t)) {
+                        state.tags.push(t);
+                        chartState.filters.add(t);
+                    }
+                });
             }
 
             editState = { id: null, field: null };
             updateUI(true); 
         }
 
-        // --- РЕНДЕР ---
+        function toggleNotes(id) {
+            if(expandedNotes.has(id)) expandedNotes.delete(id);
+            else expandedNotes.add(id);
+            updateUI(false);
+        }
+
+        function saveNoteData(id) {
+            const expIndex = state.expenses.findIndex(e => e.id === id);
+            if (expIndex !== -1) {
+                state.expenses[expIndex].notes = document.getElementById(`note-text-${id}`).value;
+                updateUI(true);
+            }
+        }
+
+        // --- ЛОГИКА ГРАФИКОВ И ФИЛЬТРОВ ---
+        function initChartFilters() {
+            chartState.filters.clear();
+            state.categories.forEach(c => chartState.filters.add(c));
+            state.tags.forEach(t => chartState.filters.add(t));
+        }
+
+        function switchChartTab(tab) {
+            chartState.activeTab = tab;
+            document.getElementById('tab-btn-categories').className = tab === 'categories' 
+                ? 'px-2 py-2 font-bold text-indigo-600 border-b-2 border-indigo-600 transition' 
+                : 'px-2 py-2 font-medium text-slate-500 hover:text-slate-800 transition';
+            document.getElementById('tab-btn-tags').className = tab === 'tags' 
+                ? 'px-2 py-2 font-bold text-indigo-600 border-b-2 border-indigo-600 transition' 
+                : 'px-2 py-2 font-medium text-slate-500 hover:text-slate-800 transition';
+            renderChartFilters();
+            renderChart();
+        }
+
+        function toggleFilter(item) {
+            if(chartState.filters.has(item)) chartState.filters.delete(item);
+            else chartState.filters.add(item);
+            renderChartFilters();
+            renderChart();
+        }
+
+        function toggleAllFilters() {
+            const items = chartState.activeTab === 'categories' ? state.categories : state.tags;
+            const allChecked = items.every(i => chartState.filters.has(i));
+            if (allChecked) {
+                items.forEach(i => chartState.filters.delete(i));
+            } else {
+                items.forEach(i => chartState.filters.add(i));
+            }
+            renderChartFilters();
+            renderChart();
+        }
+
+        function renderChartFilters() {
+            const container = document.getElementById('chart-filters-list');
+            const items = chartState.activeTab === 'categories' ? state.categories : state.tags;
+            
+            if(items.length === 0) {
+                container.innerHTML = '<p class="text-sm text-slate-400 italic">Нет данных</p>';
+                return;
+            }
+
+            container.innerHTML = items.map(item => `
+                <label class="flex items-center gap-2 cursor-pointer p-1 hover:bg-slate-50 rounded transition">
+                    <input type="checkbox" onchange="toggleFilter('${item.replace(/'/g, "\\'")}')" ${chartState.filters.has(item) ? 'checked' : ''} class="w-4 h-4 text-indigo-600 rounded">
+                    <span class="text-sm text-slate-700 truncate w-full" title="${item}">${item}</span>
+                </label>
+            `).join('');
+        }
+
+        function renderChart() {
+            if (!isChartVisible) return;
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            
+            const dataMap = {};
+            
+            if (chartState.activeTab === 'categories') {
+                state.expenses.forEach(exp => {
+                    if (chartState.filters.has(exp.category)) {
+                        dataMap[exp.category] = (dataMap[exp.category] || 0) + exp.cost;
+                    }
+                });
+            } else {
+                state.expenses.forEach(exp => {
+                    if (exp.tags && exp.tags.length > 0) {
+                        exp.tags.forEach(t => {
+                            if (chartState.filters.has(t)) {
+                                dataMap[t] = (dataMap[t] || 0) + exp.cost;
+                            }
+                        });
+                    } else if (chartState.filters.has('Без меток')) {
+                        // Для графика по тегам, если тегов нет
+                        dataMap['Без меток'] = (dataMap['Без меток'] || 0) + exp.cost;
+                    }
+                });
+            }
+
+            const labels = Object.keys(dataMap);
+            const data = Object.values(dataMap);
+
+            if (chartInstance) chartInstance.destroy();
+            
+            if(data.length === 0) {
+                // Очистка если нет данных
+                chartInstance = new Chart(ctx, { type: 'doughnut', data: { labels: [], datasets: [] } });
+                return;
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: { 
+                    labels: labels, 
+                    datasets: [{ 
+                        data: data, 
+                        backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316', '#84cc16', '#14b8a6', '#64748b'] 
+                    }] 
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    cutout: '60%', 
+                    plugins: { 
+                        legend: { position: 'right', labels: { boxWidth: 12, padding: 10, font: {size: 11} } } 
+                    } 
+                }
+            });
+        }
+
+
+        // --- РЕНДЕР ТАБЛИЦЫ ---
         function renderCategories() {
             document.getElementById('categories-list').innerHTML = state.categories.map(cat => `
-                <li class="flex flex-col sm:flex-row justify-between sm:items-center p-3 sm:p-4 hover:bg-slate-100 transition gap-2">
+                <li class="flex flex-col sm:flex-row justify-between sm:items-center p-3 hover:bg-slate-100 transition gap-2">
                     <span class="font-medium truncate">${cat}</span>
-                    <button type="button" onclick="deleteCategory('${cat}')" class="text-red-500 hover:text-red-700 text-sm font-semibold self-start sm:self-auto bg-red-50 sm:bg-transparent px-2 py-1 sm:p-0 rounded">Удалить</button>
+                    <button type="button" onclick="deleteCategory('${cat}')" class="text-red-500 hover:text-red-700 text-sm font-semibold bg-red-50 sm:bg-transparent px-2 py-1 sm:p-0 rounded">Удалить</button>
                 </li>
             `).join('');
         }
@@ -307,78 +596,84 @@
                 tbody.innerHTML += `<tr class="bg-indigo-50"><td colspan="8" class="p-3 sm:p-4 font-bold text-indigo-900">${cat}</td></tr>`;
 
                 grouped[cat].forEach(exp => {
-                    const totalRowCost = exp.cost * (exp.multiplier || 1);
-                    exp.paid ? (totalPaid += totalRowCost) : (totalUnpaid += totalRowCost);
+                    exp.paid ? (totalPaid += exp.cost) : (totalUnpaid += exp.cost);
 
                     // 1. Название
                     let nameHtml = editState.id === exp.id && editState.field === 'name' 
-                        ? `<div class="flex items-center gap-1"><input type="text" id="edit-name-${exp.id}" value="${exp.name.replace(/"/g, '&quot;')}" class="w-full sm:w-32 border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none"><button onclick="saveEdit('${exp.id}', 'name')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`
+                        ? `<div class="flex items-center gap-1"><input type="text" id="edit-name-${exp.id}" value="${exp.name.replace(/"/g, '&quot;')}" class="w-full border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none"><button onclick="saveEdit('${exp.id}', 'name')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`
                         : `<div onclick="startEdit('${exp.id}', 'name')" class="cursor-pointer group flex items-center gap-2 hover:bg-indigo-50 p-1 -ml-1 rounded transition"><span class="border-b border-dashed border-slate-400 group-hover:border-indigo-600">${exp.name}</span><span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
 
                     // 2. Ссылка
-                    let linkHtml;
-                    if (editState.id === exp.id && editState.field === 'link') {
-                        linkHtml = `<div class="flex items-center gap-1 justify-center"><input type="url" id="edit-link-${exp.id}" value="${exp.link ? exp.link.replace(/"/g, '&quot;') : ''}" placeholder="https://" class="w-24 border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none"><button onclick="saveEdit('${exp.id}', 'link')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`;
-                    } else {
-                        const linkBadge = exp.link ? `<a href="${exp.link}" target="_blank" onclick="event.stopPropagation()" class="text-blue-500 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-full text-xs font-semibold">🔗</a>` : `<span class="text-slate-300">—</span>`;
-                        linkHtml = `<div onclick="startEdit('${exp.id}', 'link')" class="cursor-pointer group flex items-center justify-center gap-1 hover:bg-indigo-50 p-1 rounded transition">${linkBadge}<span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
-                    }
+                    let linkHtml = editState.id === exp.id && editState.field === 'link'
+                        ? `<div class="flex items-center gap-1 justify-center relative z-10"><input type="url" id="edit-link-${exp.id}" value="${exp.link ? exp.link.replace(/"/g, '&quot;') : ''}" placeholder="https://" class="w-20 border border-indigo-400 rounded px-1 py-1 text-xs focus:outline-none"><button onclick="saveEdit('${exp.id}', 'link')" class="bg-emerald-500 text-white px-1 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-1 py-1 rounded text-xs font-bold">✕</button></div>`
+                        : `<div onclick="startEdit('${exp.id}', 'link')" class="cursor-pointer group flex items-center justify-center gap-1 hover:bg-indigo-50 p-1 rounded transition">${exp.link ? `<a href="${exp.link}" target="_blank" onclick="event.stopPropagation()" class="text-blue-500 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-full text-xs font-semibold">🔗</a>` : `<span class="text-slate-300">—</span>`}<span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
 
                     // 3. Цена
                     let costHtml = editState.id === exp.id && editState.field === 'cost'
-                        ? `<div class="flex items-center gap-1"><input type="number" id="edit-cost-${exp.id}" value="${exp.cost}" step="0.01" min="0" class="w-20 sm:w-24 border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none"><button onclick="saveEdit('${exp.id}', 'cost')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`
-                        : `<div onclick="startEdit('${exp.id}', 'cost')" class="cursor-pointer group flex items-center gap-2 hover:bg-indigo-50 p-1 -ml-1 rounded transition"><span class="border-b border-dashed border-slate-400 group-hover:border-indigo-600 group-hover:text-indigo-600">${exp.cost.toLocaleString('ru-RU')} ₽</span><span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
+                        ? `<div class="flex items-center gap-1"><input type="number" id="edit-cost-${exp.id}" value="${exp.cost}" step="0.01" min="0" class="w-20 border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none"><button onclick="saveEdit('${exp.id}', 'cost')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`
+                        : `<div onclick="startEdit('${exp.id}', 'cost')" class="cursor-pointer group flex items-center gap-2 hover:bg-indigo-50 p-1 -ml-1 rounded transition"><span class="border-b border-dashed border-slate-400 group-hover:border-indigo-600 font-bold">${exp.cost.toLocaleString('ru-RU')} ₽</span><span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
 
-                    // 4. Множитель
-                    let multHtml = editState.id === exp.id && editState.field === 'multiplier'
-                        ? `<div class="flex items-center justify-center gap-1"><input type="number" id="edit-multiplier-${exp.id}" value="${exp.multiplier || ''}" step="0.01" min="0" class="w-16 border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none"><button onclick="saveEdit('${exp.id}', 'multiplier')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`
-                        : `<div onclick="startEdit('${exp.id}', 'multiplier')" class="cursor-pointer group flex items-center justify-center gap-1 hover:bg-indigo-50 p-1 rounded transition"><span class="border-b border-dashed border-slate-400 group-hover:border-indigo-600 text-slate-500">${exp.multiplier ? `x${exp.multiplier}` : '—'}</span><span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
+                    // 4. Метки (Теги)
+                    let tagsListStr = exp.tags && exp.tags.length > 0 
+                        ? exp.tags.map(t => `<span class="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded">${t}</span>`).join(' ') 
+                        : `<span class="text-slate-300">—</span>`;
+                    
+                    let tagsHtml = editState.id === exp.id && editState.field === 'tags'
+                        ? `<div class="flex items-center gap-1 relative z-10"><input type="text" id="edit-tags-${exp.id}" value="${(exp.tags || []).join(', ')}" placeholder="через запятую" class="w-full border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none"><button onclick="saveEdit('${exp.id}', 'tags')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`
+                        : `<div onclick="startEdit('${exp.id}', 'tags')" class="cursor-pointer group flex flex-wrap items-center gap-1 hover:bg-indigo-50 p-1 -ml-1 rounded transition">${tagsListStr}<span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400 ml-1">✏️</span></div>`;
 
-                    // 5. Статус оплаты
-                    let paidHtml;
-                    if (editState.id === exp.id && editState.field === 'paid') {
-                        paidHtml = `<div class="flex items-center justify-center gap-2 bg-white border border-indigo-200 p-1 rounded"><input type="checkbox" id="edit-paid-${exp.id}" ${exp.paid ? 'checked' : ''} class="w-4 h-4 text-indigo-600 rounded"><button onclick="saveEdit('${exp.id}', 'paid')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`;
-                    } else {
-                        const paidBadge = exp.paid ? '<span class="text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-1 rounded-full border-b border-dashed border-emerald-400">Оплачено</span>' : '<span class="text-slate-400 text-xs border-b border-dashed border-slate-300">В плане</span>';
-                        paidHtml = `<div onclick="startEdit('${exp.id}', 'paid')" class="cursor-pointer group flex items-center justify-center gap-1 hover:bg-indigo-50 p-1 rounded transition">${paidBadge}<span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
-                    }
+                    // 5. Приоритет
+                    let priorityHtml = editState.id === exp.id && editState.field === 'priority'
+                        ? `<div class="flex items-center justify-center gap-1 bg-white border border-indigo-200 p-1 rounded relative z-10"><input type="checkbox" id="edit-priority-${exp.id}" ${exp.priority ? 'checked' : ''} class="w-4 h-4 text-indigo-600 rounded"><button onclick="saveEdit('${exp.id}', 'priority')" class="bg-emerald-500 text-white px-1 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-1 py-1 rounded text-xs font-bold">✕</button></div>`
+                        : `<div onclick="startEdit('${exp.id}', 'priority')" class="cursor-pointer group flex items-center justify-center gap-1 hover:bg-indigo-50 p-1 rounded transition">${exp.priority ? '<span title="Высокий приоритет">🔥</span>' : '<span class="text-slate-300">—</span>'}<span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
 
+                    // 6. Статус
+                    let paidHtml = editState.id === exp.id && editState.field === 'paid'
+                        ? `<div class="flex items-center justify-center gap-1 bg-white border border-indigo-200 p-1 rounded relative z-10"><input type="checkbox" id="edit-paid-${exp.id}" ${exp.paid ? 'checked' : ''} class="w-4 h-4 text-emerald-600 rounded"><button onclick="saveEdit('${exp.id}', 'paid')" class="bg-emerald-500 text-white px-1 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-1 py-1 rounded text-xs font-bold">✕</button></div>`
+                        : `<div onclick="startEdit('${exp.id}', 'paid')" class="cursor-pointer group flex items-center justify-center gap-1 hover:bg-indigo-50 p-1 rounded transition">${exp.paid ? '<span class="text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-1 rounded-full border-b border-dashed border-emerald-400">Оплачено</span>' : '<span class="text-slate-400 text-xs border-b border-dashed border-slate-300">В плане</span>'}<span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
+
+                    // 7. Заметки (Кнопка)
+                    let noteIndicator = exp.notes && exp.notes.trim() !== '' ? '📝 ' : '';
+                    let notesBtn = `<button onclick="toggleNotes('${exp.id}')" class="text-xs font-semibold px-2 py-1 rounded transition ${expandedNotes.has(exp.id) ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">${noteIndicator}${expandedNotes.has(exp.id) ? 'Свернуть' : 'Развернуть'}</button>`;
+
+                    // Отрисовка основной строки
                     tbody.innerHTML += `
-                        <tr class="hover:bg-slate-50 border-y border-slate-100 transition-colors">
-                            <td class="p-3 sm:p-4">${nameHtml}</td>
-                            <td class="p-3 sm:p-4 text-center">${linkHtml}</td>
-                            <td class="p-3 sm:p-4 whitespace-nowrap">${costHtml}</td>
-                            <td class="p-3 sm:p-4 text-center">${multHtml}</td>
-                            <td class="p-3 sm:p-4 font-bold whitespace-nowrap">${totalRowCost.toLocaleString('ru-RU')} ₽</td>
-                            <td class="p-3 sm:p-4 text-center">${exp.priority ? '<span title="Высокий приоритет">🔥</span>' : ''}</td>
-                            <td class="p-3 sm:p-4 text-center">${paidHtml}</td>
-                            <td class="p-3 sm:p-4 text-right">
+                        <tr class="hover:bg-slate-50 border-t border-slate-100 transition-colors">
+                            <td class="p-3">${nameHtml}</td>
+                            <td class="p-3 text-center">${linkHtml}</td>
+                            <td class="p-3 whitespace-nowrap">${costHtml}</td>
+                            <td class="p-3">${tagsHtml}</td>
+                            <td class="p-3 text-center">${priorityHtml}</td>
+                            <td class="p-3 text-center">${paidHtml}</td>
+                            <td class="p-3 text-center">${notesBtn}</td>
+                            <td class="p-3 text-right">
                                 <button onclick="deleteExpense('${exp.id}')" class="text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition" title="Удалить">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                 </button>
                             </td>
                         </tr>
                     `;
+
+                    // Отрисовка подстроки с заметками
+                    if (expandedNotes.has(exp.id)) {
+                        tbody.innerHTML += `
+                            <tr class="bg-indigo-50/30 border-b border-indigo-100">
+                                <td colspan="8" class="p-3 pl-6 pr-6">
+                                    <div class="flex flex-col gap-2">
+                                        <label class="text-xs font-semibold text-indigo-800 uppercase tracking-wider">Заметки к статье:</label>
+                                        <textarea id="note-text-${exp.id}" rows="2" class="w-full border border-indigo-200 rounded p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" placeholder="Укажите любые детали, размеры, контакты подрядчика...">${exp.notes || ''}</textarea>
+                                        <div class="flex justify-end">
+                                            <button onclick="saveNoteData('${exp.id}')" class="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow-sm transition">Сохранить заметку</button>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    }
                 });
             });
             document.getElementById('grand-total-paid').textContent = totalPaid.toLocaleString('ru-RU');
             document.getElementById('grand-total-unpaid').textContent = totalUnpaid.toLocaleString('ru-RU');
-        }
-
-        function renderChart() {
-            const section = document.getElementById('chart-section');
-            if (!isChartVisible || state.expenses.length === 0) { 
-                section.classList.add('hidden'); section.classList.remove('flex'); return; 
-            }
-            section.classList.remove('hidden'); section.classList.add('flex');
-            const categoryTotals = {};
-            state.expenses.forEach(exp => { categoryTotals[exp.category] = (categoryTotals[exp.category] || 0) + (exp.cost * (exp.multiplier || 1)); });
-            if (chartInstance) chartInstance.destroy();
-            chartInstance = new Chart(document.getElementById('expenseChart').getContext('2d'), {
-                type: 'doughnut',
-                data: { labels: Object.keys(categoryTotals), datasets: [{ data: Object.values(categoryTotals), backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316', '#84cc16', '#14b8a6'] }] },
-                options: { responsive: true, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15 } } } }
-            });
         }
     </script>
 </body>
