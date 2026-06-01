@@ -10,7 +10,7 @@
         .hidden-section { display: none; }
         #loader { display: none; }
         .is-loading #loader { display: flex; }
-        
+
         input[type="number"]::-webkit-outer-spin-button,
         input[type="number"]::-webkit-inner-spin-button {
             -webkit-appearance: none;
@@ -20,630 +20,747 @@
             -moz-appearance: textfield;
         }
 
-        /* Кастомный скроллбар для списка фильтров */
+        /* Кастомный скроллбар */
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; rounded-lg; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans p-4 sm:p-6 min-h-screen relative">
 
-    <div id="loader" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-slate-800 text-white px-6 py-4 rounded-xl shadow-2xl z-[100] items-center gap-3">
-        <svg class="animate-spin h-6 w-6 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <span id="loader-text" class="font-medium text-lg tracking-wide">Синхронизация...</span>
+<div id="loader" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-slate-800 text-white px-6 py-4 rounded-xl shadow-2xl z-[100] items-center gap-3">
+    <svg class="animate-spin h-6 w-6 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+    <span id="loader-text" class="font-medium text-lg tracking-wide">Синхронизация...</span>
+</div>
+
+<div id="payment-popup" class="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-[calc(100%-2rem)] sm:w-80 bg-white rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] border border-indigo-200 z-[90] hidden flex-col overflow-hidden transition-all duration-300">
+    <div class="bg-indigo-600 hover:bg-indigo-700 text-white p-3 sm:p-4 flex justify-between items-center cursor-pointer transition-colors" onclick="togglePaymentPopup()">
+        <div class="font-bold flex items-center gap-2 text-sm sm:text-base">
+            🛒 К оплате: <span id="payment-popup-total">0 $</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <span id="payment-popup-badge" class="bg-indigo-800 text-xs px-2 py-1 rounded-full font-bold shadow-inner">0</span>
+            <button class="text-white hover:text-indigo-200 focus:outline-none">
+                <svg id="payment-popup-icon" class="w-5 h-5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+        </div>
+    </div>
+    <div id="payment-popup-body" class="p-4 bg-slate-50 max-h-64 sm:max-h-80 overflow-y-auto custom-scrollbar flex flex-col gap-3">
+    </div>
+</div>
+
+<div class="max-w-[96%] xl:max-w-[1400px] mx-auto">
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 border-b pb-4 border-slate-200 gap-4">
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">Учет расходов на ремонт</h1>
+            <p class="text-sm sm:text-base text-slate-500 mt-1">Синхронизация через JSONBin</p>
+        </div>
+        <div class="text-left md:text-right w-full md:w-auto bg-white md:bg-transparent p-4 md:p-0 rounded-xl md:rounded-none shadow-sm md:shadow-none border md:border-none border-slate-200">
+            <p class="text-xs sm:text-sm text-slate-500 uppercase tracking-wide font-semibold mb-1">Оплачено (Осталось):</p>
+            <p class="text-2xl sm:text-3xl font-bold text-indigo-600 truncate">
+                <span id="grand-total-paid">0</span> $                <span class="text-lg sm:text-xl text-slate-400 font-medium whitespace-nowrap">(<span id="grand-total-unpaid">0</span>$)</span>
+            </p>
+        </div>
+    </header>
+
+    <div class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 mb-6">
+        <button onclick="toggleSection('categories-section')" class="w-full sm:w-auto bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-4 py-3 sm:py-2 rounded-lg font-medium transition shadow-sm text-center">
+            📁 Категории
+        </button>
+        <button onclick="toggleSection('expenses-section')" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 sm:py-2 rounded-lg font-medium transition shadow-sm text-center">
+            ➕ Добавить расход
+        </button>
+        <button onclick="toggleChart()" class="w-full sm:w-auto bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-4 py-3 sm:py-2 rounded-lg font-medium transition shadow-sm text-center">
+            📊 Графики и Фильтры
+        </button>
+        <button onclick="loadData()" class="w-full sm:w-auto bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-3 sm:py-2 rounded-lg font-medium transition shadow-sm sm:ml-auto text-center mt-2 sm:mt-0">
+            🔄 Обновить данные
+        </button>
     </div>
 
-    <div class="max-w-[96%] xl:max-w-[1400px] mx-auto">
-        <header class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 border-b pb-4 border-slate-200 gap-4">
-            <div>
-                <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">Учет расходов на ремонт</h1>
-                <p class="text-sm sm:text-base text-slate-500 mt-1">Синхронизация через JSONBin</p>
+    <div id="categories-section" class="hidden-section bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 mb-6">
+        <h2 class="text-lg sm:text-xl font-bold mb-4">Категории расходов</h2>
+        <form id="category-form" class="flex flex-col sm:flex-row gap-3 mb-6">
+            <input type="text" id="new-category-name" required placeholder="Название новой категории" class="flex-grow border border-slate-300 rounded-lg px-4 py-3 sm:py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <button type="submit" class="bg-slate-800 text-white px-6 py-3 sm:py-2 rounded-lg hover:bg-slate-700 transition">Добавить</button>
+        </form>
+        <ul id="categories-list" class="divide-y divide-slate-200 bg-slate-50 rounded-lg border border-slate-200"></ul>
+    </div>
+
+    <div id="expenses-section" class="hidden-section bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 mb-6 overflow-visible">
+        <h2 class="text-lg sm:text-xl font-bold mb-4">Новая статья расходов</h2>
+        <form id="expense-form" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="col-span-1 md:col-span-2 flex flex-col">
+                <label class="text-sm font-semibold text-slate-600 mb-1">Название *</label>
+                <input type="text" id="exp-name" required class="border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
             </div>
-            <div class="text-left md:text-right w-full md:w-auto bg-white md:bg-transparent p-4 md:p-0 rounded-xl md:rounded-none shadow-sm md:shadow-none border md:border-none border-slate-200">
-                <p class="text-xs sm:text-sm text-slate-500 uppercase tracking-wide font-semibold mb-1">Оплачено (Осталось):</p>
-                <p class="text-2xl sm:text-3xl font-bold text-indigo-600 truncate">
-                    <span id="grand-total-paid">0</span> ₽ 
-                    <span class="text-lg sm:text-xl text-slate-400 font-medium whitespace-nowrap">(<span id="grand-total-unpaid">0</span> ₽)</span>
-                </p>
+            <div class="col-span-1 flex flex-col">
+                <label class="text-sm font-semibold text-slate-600 mb-1">Категория *</label>
+                <select id="exp-category" required class="border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500"></select>
             </div>
-        </header>
 
-        <div class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 mb-6">
-            <button onclick="toggleSection('categories-section')" class="w-full sm:w-auto bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-4 py-3 sm:py-2 rounded-lg font-medium transition shadow-sm text-center">
-                📁 Категории
-            </button>
-            <button onclick="toggleSection('expenses-section')" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 sm:py-2 rounded-lg font-medium transition shadow-sm text-center">
-                ➕ Добавить расход
-            </button>
-            <button onclick="toggleChart()" class="w-full sm:w-auto bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-4 py-3 sm:py-2 rounded-lg font-medium transition shadow-sm text-center">
-                📊 Графики и Фильтры
-            </button>
-            <button onclick="loadData()" class="w-full sm:w-auto bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-3 sm:py-2 rounded-lg font-medium transition shadow-sm sm:ml-auto text-center mt-2 sm:mt-0">
-                🔄 Обновить данные
-            </button>
-        </div>
+            <div class="col-span-1 flex flex-col relative">
+                <label class="text-sm font-semibold text-slate-600 mb-1">Метки (через запятую)</label>
+                <div class="flex flex-wrap gap-1 mb-1" id="form-tags-container"></div>
+                <input type="text" id="exp-tags-input" autocomplete="off" placeholder="Например: кухня, сантехника" class="border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <div id="form-tags-suggestions" class="absolute top-full left-0 mt-1 w-full bg-white border border-slate-200 shadow-lg rounded-lg z-50 hidden max-h-40 overflow-y-auto custom-scrollbar"></div>
+            </div>
 
-        <div id="categories-section" class="hidden-section bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 mb-6">
-            <h2 class="text-lg sm:text-xl font-bold mb-4">Категории расходов</h2>
-            <form id="category-form" class="flex flex-col sm:flex-row gap-3 mb-6">
-                <input type="text" id="new-category-name" required placeholder="Название новой категории" class="flex-grow border border-slate-300 rounded-lg px-4 py-3 sm:py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <button type="submit" class="bg-slate-800 text-white px-6 py-3 sm:py-2 rounded-lg hover:bg-slate-700 transition">Добавить</button>
-            </form>
-            <ul id="categories-list" class="divide-y divide-slate-200 bg-slate-50 rounded-lg border border-slate-200"></ul>
-        </div>
+            <div class="col-span-1 flex flex-col">
+                <label class="text-sm font-semibold text-slate-600 mb-1">Стоимость *</label>
+                <input type="number" id="exp-cost" required step="0.01" min="0" class="border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
 
-        <div id="expenses-section" class="hidden-section bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 mb-6 overflow-visible">
-            <h2 class="text-lg sm:text-xl font-bold mb-4">Новая статья расходов</h2>
-            <form id="expense-form" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="col-span-1 md:col-span-2 flex flex-col">
-                    <label class="text-sm font-semibold text-slate-600 mb-1">Название *</label>
-                    <input type="text" id="exp-name" required class="border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-                <div class="col-span-1 flex flex-col">
-                    <label class="text-sm font-semibold text-slate-600 mb-1">Категория *</label>
-                    <select id="exp-category" required class="border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500"></select>
-                </div>
-                
-                <div class="col-span-1 flex flex-col relative">
-                    <label class="text-sm font-semibold text-slate-600 mb-1">Метки (через запятую)</label>
-                    <div class="flex flex-wrap gap-1 mb-1" id="form-tags-container"></div>
-                    <input type="text" id="exp-tags-input" autocomplete="off" placeholder="Например: кухня, сантехника" class="border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <div id="form-tags-suggestions" class="absolute top-full left-0 mt-1 w-full bg-white border border-slate-200 shadow-lg rounded-lg z-50 hidden max-h-40 overflow-y-auto custom-scrollbar"></div>
+            <div class="col-span-1 flex flex-col">
+                <label class="text-sm font-semibold text-slate-600 mb-1">Ссылка на товар</label>
+                <input type="url" id="exp-link" placeholder="https://..." class="border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+
+            <div class="col-span-1 md:col-span-3 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 mt-2">
+                <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 sm:p-0 rounded-lg border border-slate-200 sm:border-none sm:bg-transparent">
+                    <input type="checkbox" id="exp-paid" class="w-5 h-5 text-emerald-600 rounded">
+                    <span class="text-slate-700 font-medium text-sm">✅ Оплата проведена</span>
+                </label>
+            </div>
+            <div class="col-span-1 md:col-span-3 mt-2">
+                <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition shadow-md">Сохранить расход</button>
+            </div>
+        </form>
+    </div>
+
+    <div id="chart-section" class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 mb-6 hidden">
+        <h2 class="text-lg sm:text-xl font-bold mb-6">Аналитика</h2>
+        <div class="flex flex-col lg:flex-row gap-8 w-full">
+            <div class="w-full lg:w-2/3 max-w-md mx-auto flex items-center justify-center relative min-h-[300px]">
+                <canvas id="expenseChart"></canvas>
+            </div>
+
+            <div class="w-full lg:w-1/3 flex flex-col border-t lg:border-t-0 lg:border-l border-slate-200 pt-6 lg:pt-0 lg:pl-6">
+                <div class="flex gap-4 mb-4 border-b border-slate-200">
+                    <button id="tab-btn-categories" onclick="switchChartTab('categories')" class="px-2 py-2 font-bold text-indigo-600 border-b-2 border-indigo-600 transition">По категориям</button>
+                    <button id="tab-btn-tags" onclick="switchChartTab('tags')" class="px-2 py-2 font-medium text-slate-500 hover:text-slate-800 transition">По меткам</button>
                 </div>
 
-                <div class="col-span-1 flex flex-col">
-                    <label class="text-sm font-semibold text-slate-600 mb-1">Стоимость *</label>
-                    <input type="number" id="exp-cost" required step="0.01" min="0" class="border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Отображать:</span>
+                    <button onclick="toggleAllFilters()" class="text-xs text-indigo-500 hover:text-indigo-700 underline">Переключить все</button>
                 </div>
-                
-                <div class="col-span-1 flex flex-col">
-                    <label class="text-sm font-semibold text-slate-600 mb-1">Ссылка на товар</label>
-                    <input type="url" id="exp-link" placeholder="https://..." class="border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-
-                <div class="col-span-1 md:col-span-3 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 mt-2">
-                    <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 sm:p-0 rounded-lg border border-slate-200 sm:border-none sm:bg-transparent">
-                        <input type="checkbox" id="exp-priority" class="w-5 h-5 text-indigo-600 rounded">
-                        <span class="text-slate-700 font-medium text-sm">🔥 Высокий приоритет</span>
-                    </label>
-                    <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 sm:p-0 rounded-lg border border-slate-200 sm:border-none sm:bg-transparent">
-                        <input type="checkbox" id="exp-paid" class="w-5 h-5 text-emerald-600 rounded">
-                        <span class="text-slate-700 font-medium text-sm">✅ Оплата проведена</span>
-                    </label>
-                </div>
-                <div class="col-span-1 md:col-span-3 mt-2">
-                    <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition shadow-md">Сохранить расход</button>
-                </div>
-            </form>
-        </div>
-
-        <div id="chart-section" class="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 mb-6 hidden">
-            <h2 class="text-lg sm:text-xl font-bold mb-6">Аналитика</h2>
-            <div class="flex flex-col lg:flex-row gap-8 w-full">
-                <div class="w-full lg:w-2/3 max-w-md mx-auto flex items-center justify-center relative min-h-[300px]">
-                    <canvas id="expenseChart"></canvas>
-                </div>
-                
-                <div class="w-full lg:w-1/3 flex flex-col border-t lg:border-t-0 lg:border-l border-slate-200 pt-6 lg:pt-0 lg:pl-6">
-                    <div class="flex gap-4 mb-4 border-b border-slate-200">
-                        <button id="tab-btn-categories" onclick="switchChartTab('categories')" class="px-2 py-2 font-bold text-indigo-600 border-b-2 border-indigo-600 transition">По категориям</button>
-                        <button id="tab-btn-tags" onclick="switchChartTab('tags')" class="px-2 py-2 font-medium text-slate-500 hover:text-slate-800 transition">По меткам</button>
-                    </div>
-                    
-                    <div class="flex justify-between items-center mb-3">
-                        <span class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Отображать:</span>
-                        <button onclick="toggleAllFilters()" class="text-xs text-indigo-500 hover:text-indigo-700 underline">Переключить все</button>
-                    </div>
-                    <div id="chart-filters-list" class="flex flex-col gap-2 overflow-y-auto max-h-64 custom-scrollbar pr-2">
-                        </div>
+                <div id="chart-filters-list" class="flex flex-col gap-2 overflow-y-auto max-h-64 custom-scrollbar pr-2">
                 </div>
             </div>
-        </div>
-
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-visible mb-12">
-            <div class="overflow-x-auto overflow-y-visible">
-                <table class="w-full text-left border-collapse min-w-[900px]">
-                    <thead>
-                        <tr class="bg-slate-100 text-slate-600 text-xs sm:text-sm uppercase tracking-wider">
-                            <th class="p-3 font-semibold w-1/4">Название</th>
-                            <th class="p-3 font-semibold text-center w-16">Ссылка</th>
-                            <th class="p-3 font-semibold w-32">Цена</th>
-                            <th class="p-3 font-semibold w-48">Метки</th>
-                            <th class="p-3 font-semibold text-center w-24">Приоритет</th>
-                            <th class="p-3 font-semibold text-center w-28">Статус</th>
-                            <th class="p-3 font-semibold text-center w-24">Заметка</th>
-                            <th class="p-3 font-semibold text-right w-16">Действия</th>
-                        </tr>
-                    </thead>
-                    <tbody id="expenses-table-body" class="divide-y divide-slate-200 text-slate-800 text-sm"></tbody>
-                </table>
-            </div>
-            <div id="empty-state" class="text-center py-12 text-slate-500 hidden">Расходов пока нет. Добавьте первую запись!</div>
         </div>
     </div>
 
-    <script>
-        // --- НАСТРОЙКИ JSONBIN ---
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-visible mb-12">
+        <div class="overflow-x-auto overflow-y-visible">
+            <table class="w-full text-left border-collapse min-w-[900px]">
+                <thead>
+                <tr class="bg-slate-100 text-slate-600 text-xs sm:text-sm uppercase tracking-wider">
+                    <th class="p-3 font-semibold w-1/4">Название</th>
+                    <th class="p-3 font-semibold text-center w-16">Ссылка</th>
+                    <th class="p-3 font-semibold w-32">Цена</th>
+                    <th class="p-3 font-semibold w-48">Метки</th>
+                    <th class="p-3 font-semibold text-center w-28">Статус</th>
+                    <th class="p-3 font-semibold text-center w-24">Заметка</th>
+                    <th class="p-3 font-semibold text-right w-16">Действия</th>
+                </tr>
+                </thead>
+                <tbody id="expenses-table-body" class="divide-y divide-slate-200 text-slate-800 text-sm"></tbody>
+            </table>
+        </div>
+        <div id="empty-state" class="text-center py-12 text-slate-500 hidden">Расходов пока нет. Добавьте первую запись!</div>
+    </div>
+</div>
 
-        const BIN_ID = '69beb233aa77b81da90633e6'; 
-        const API_KEY = '$2a$10$S98/2wp40ia3C1CzsHd6euLAUhjtow7BzBS57fF3XRrcDnUxw2FpG';
+<script>
+    // --- НАСТРОЙКИ JSONBIN ---
 
-        const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+    const BIN_ID = '69beb233aa77b81da90633e6';
+    const API_KEY = '$2a$10$S98/2wp40ia3C1CzsHd6euLAUhjtow7BzBS57fF3XRrcDnUxw2FpG';
 
-        let state = { categories: [], tags: [], expenses: [] };
-        let chartInstance = null;
-        let isChartVisible = false; 
-        
-        let editState = { id: null, field: null }; 
-        let expandedNotes = new Set(); // ID расходов, у которых открыта заметка
-        
-        // Переменные для формы добавления меток
-        let currentFormTags = [];
+    const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
-        // Состояние графика
-        let chartState = {
-            activeTab: 'categories', // 'categories' | 'tags'
-            filters: new Set() // Активные фильтры (названия категорий или меток)
-        };
+    let state = { categories: [], tags: [], expenses: [] };
+    let chartInstance = null;
+    let isChartVisible = false;
 
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('category-form').addEventListener('submit', addCategory);
-            document.getElementById('expense-form').addEventListener('submit', addExpense);
-            setupTagInputLogic();
-            loadData();
+    let editState = { id: null, field: null };
+    let expandedNotes = new Set(); // ID расходов, у которых открыта заметка
+
+    // Стейт для всплывающего окна "К оплате"
+    let selectedForPayment = new Set();
+    let isPaymentPopupMinimized = false;
+
+    // Переменные для формы добавления меток
+    let currentFormTags = [];
+
+    // Состояние графика
+    let chartState = {
+        activeTab: 'categories', // 'categories' | 'tags'
+        filters: new Set() // Активные фильтры (названия категорий или меток)
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('category-form').addEventListener('submit', addCategory);
+        document.getElementById('expense-form').addEventListener('submit', addExpense);
+        setupTagInputLogic();
+        loadData();
+    });
+
+    function setLoader(isLoading, text = 'Синхронизация...') {
+        document.getElementById('loader-text').textContent = text;
+        document.body.classList.toggle('is-loading', isLoading);
+    }
+
+    async function loadData() {
+        if (BIN_ID.includes('ВСТАВЬ')) { alert('Сначала настрой BIN_ID и API_KEY в коде!'); return; }
+        setLoader(true, 'Загрузка данных...');
+        try {
+            const response = await fetch(`${API_URL}/latest`, { headers: { 'X-Master-Key': API_KEY } });
+            if (!response.ok) throw new Error('Ошибка сети');
+            const data = (await response.json()).record;
+
+            state.categories = data.categories || [];
+            state.tags = data.tags || [];
+            state.expenses = (data.expenses || []).map(exp => ({
+                ...exp,
+                tags: exp.tags || [],
+                notes: exp.notes || ''
+            }));
+
+            initChartFilters();
+            updateUI(false);
+        } catch (error) {
+            console.error(error); alert('Не удалось загрузить данные.');
+        } finally {
+            setLoader(false);
+        }
+    }
+
+    async function saveData() {
+        setLoader(true, 'Сохранение...');
+        try {
+            const response = await fetch(API_URL, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
+                body: JSON.stringify(state)
+            });
+            if (!response.ok) throw new Error('Ошибка сети при сохранении');
+        } catch (error) {
+            console.error(error); alert('Не удалось сохранить данные!');
+        } finally {
+            setLoader(false);
+        }
+    }
+
+    function toggleSection(sectionId) { document.getElementById(sectionId).classList.toggle('hidden-section'); }
+    function toggleChart() {
+        isChartVisible = !isChartVisible;
+        const section = document.getElementById('chart-section');
+        if(isChartVisible) {
+            section.classList.remove('hidden');
+            section.classList.add('block');
+            renderChart();
+        } else {
+            section.classList.add('hidden');
+            section.classList.remove('block');
+        }
+    }
+
+    // --- ЛОГИКА ОКНА ОПЛАТЫ ---
+    function togglePaymentSelection(id, isChecked) {
+        if (isChecked) {
+            selectedForPayment.add(id);
+        } else {
+            selectedForPayment.delete(id);
+        }
+        renderPaymentPopup();
+    }
+
+    function togglePaymentPopup() {
+        isPaymentPopupMinimized = !isPaymentPopupMinimized;
+        const body = document.getElementById('payment-popup-body');
+        const icon = document.getElementById('payment-popup-icon');
+        if (isPaymentPopupMinimized) {
+            body.classList.add('hidden');
+            icon.classList.add('rotate-180');
+        } else {
+            body.classList.remove('hidden');
+            icon.classList.remove('rotate-180');
+        }
+    }
+
+    function renderPaymentPopup() {
+        const popup = document.getElementById('payment-popup');
+
+        // Если ничего не выбрано - скрываем окно целиком
+        if (selectedForPayment.size === 0) {
+            popup.classList.add('hidden');
+            popup.classList.remove('flex');
+            return;
+        }
+
+        popup.classList.remove('hidden');
+        popup.classList.add('flex');
+
+        let total = 0;
+        const grouped = {};
+
+        selectedForPayment.forEach(id => {
+            const exp = state.expenses.find(e => e.id === id);
+            // Если нашли и он до сих пор не оплачен
+            if (exp && !exp.paid) {
+                if (!grouped[exp.category]) grouped[exp.category] = [];
+                grouped[exp.category].push(exp);
+                total += exp.cost;
+            } else {
+                selectedForPayment.delete(id); // Очистка неактуальных id
+            }
         });
 
-        function setLoader(isLoading, text = 'Синхронизация...') {
-            document.getElementById('loader-text').textContent = text;
-            document.body.classList.toggle('is-loading', isLoading);
+        // Если после проверки выяснилось, что все валидные записи исчезли
+        if (selectedForPayment.size === 0) {
+            popup.classList.add('hidden');
+            popup.classList.remove('flex');
+            return;
         }
 
-        async function loadData() {
-            if (BIN_ID.includes('ВСТАВЬ')) { alert('Сначала настрой BIN_ID и API_KEY в коде!'); return; }
-            setLoader(true, 'Загрузка данных...');
-            try {
-                const response = await fetch(`${API_URL}/latest`, { headers: { 'X-Master-Key': API_KEY } });
-                if (!response.ok) throw new Error('Ошибка сети');
-                const data = (await response.json()).record;
-                
-                // Миграция старых данных (если не было tags/notes)
-                state.categories = data.categories || [];
-                state.tags = data.tags || [];
-                state.expenses = (data.expenses || []).map(exp => ({
-                    ...exp,
-                    tags: exp.tags || [],
-                    notes: exp.notes || ''
-                }));
-                
-                initChartFilters();
-                updateUI(false); 
-            } catch (error) {
-                console.error(error); alert('Не удалось загрузить данные.');
-            } finally {
-                setLoader(false);
+        document.getElementById('payment-popup-total').textContent = total.toLocaleString('ru-RU') + ' $';
+        document.getElementById('payment-popup-badge').textContent = selectedForPayment.size;
+
+        const body = document.getElementById('payment-popup-body');
+        body.innerHTML = '';
+
+        for (const [cat, items] of Object.entries(grouped)) {
+            let itemsHtml = items.map(item => `
+                <div class="flex justify-between items-center text-sm border-b border-slate-200 pb-1 mb-1 last:border-0 last:mb-0 last:pb-0">
+                    <span class="truncate pr-2 text-slate-700">${item.name}</span>
+                    <span class="font-bold whitespace-nowrap text-slate-900">${item.cost.toLocaleString('ru-RU')} $</span>
+                </div>
+            `).join('');
+
+            body.innerHTML += `
+                <div class="mb-3 last:mb-0">
+                    <div class="text-xs font-bold text-indigo-800 uppercase mb-1">${cat}</div>
+                    ${itemsHtml}
+                </div>
+            `;
+        }
+    }
+
+    function updateUI(triggerSave = false) {
+        renderCategories();
+        renderCategorySelect();
+        renderExpensesTable();
+        if(isChartVisible) renderChart();
+        renderPaymentPopup(); // Обновляем окно оплаты на случай, если изменилась цена
+        if (triggerSave) saveData();
+    }
+
+    // --- ЛОГИКА ФОРМЫ ТЕГОВ ---
+    function setupTagInputLogic() {
+        const input = document.getElementById('exp-tags-input');
+        const suggestionsEl = document.getElementById('form-tags-suggestions');
+
+        input.addEventListener('input', (e) => {
+            const val = e.target.value;
+            if(val.includes(',')) {
+                const newTags = val.split(',').map(t => t.trim()).filter(t => t);
+                newTags.forEach(t => { if(!currentFormTags.includes(t)) currentFormTags.push(t); });
+                e.target.value = '';
+                renderFormTags();
+                suggestionsEl.classList.add('hidden');
+                return;
             }
-        }
 
-        async function saveData() {
-            setLoader(true, 'Сохранение...');
-            try {
-                const response = await fetch(API_URL, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
-                    body: JSON.stringify(state)
-                });
-                if (!response.ok) throw new Error('Ошибка сети при сохранении');
-            } catch (error) {
-                console.error(error); alert('Не удалось сохранить данные!');
-            } finally {
-                setLoader(false);
-            }
-        }
-
-        function toggleSection(sectionId) { document.getElementById(sectionId).classList.toggle('hidden-section'); }
-        function toggleChart() { 
-            isChartVisible = !isChartVisible; 
-            const section = document.getElementById('chart-section');
-            if(isChartVisible) {
-                section.classList.remove('hidden');
-                section.classList.add('block');
-                renderChart();
-            } else {
-                section.classList.add('hidden');
-                section.classList.remove('block');
-            }
-        }
-        
-        function updateUI(triggerSave = false) { 
-            renderCategories(); 
-            renderCategorySelect(); 
-            renderExpensesTable(); 
-            if(isChartVisible) renderChart(); 
-            if (triggerSave) saveData(); 
-        }
-
-        // --- ЛОГИКА ФОРМЫ ТЕГОВ ---
-        function setupTagInputLogic() {
-            const input = document.getElementById('exp-tags-input');
-            const suggestionsEl = document.getElementById('form-tags-suggestions');
-
-            input.addEventListener('input', (e) => {
-                const val = e.target.value;
-                if(val.includes(',')) {
-                    const newTags = val.split(',').map(t => t.trim()).filter(t => t);
-                    newTags.forEach(t => { if(!currentFormTags.includes(t)) currentFormTags.push(t); });
-                    e.target.value = '';
-                    renderFormTags();
-                    suggestionsEl.classList.add('hidden');
-                    return;
-                }
-
-                const query = val.trim().toLowerCase();
-                if(query.length > 0) {
-                    const matches = state.tags.filter(t => t.toLowerCase().includes(query) && !currentFormTags.includes(t));
-                    if(matches.length > 0) {
-                        suggestionsEl.innerHTML = matches.map(m => `<div onclick="addTagToForm('${m.replace(/'/g, "\\'")}')" class="p-2 hover:bg-indigo-50 cursor-pointer text-sm border-b border-slate-100">${m}</div>`).join('');
-                        suggestionsEl.classList.remove('hidden');
-                    } else {
-                        suggestionsEl.classList.add('hidden');
-                    }
+            const query = val.trim().toLowerCase();
+            if(query.length > 0) {
+                const matches = state.tags.filter(t => t.toLowerCase().includes(query) && !currentFormTags.includes(t));
+                if(matches.length > 0) {
+                    suggestionsEl.innerHTML = matches.map(m => `<div onclick="addTagToForm('${m.replace(/'/g, "\\'")}')" class="p-2 hover:bg-indigo-50 cursor-pointer text-sm border-b border-slate-100">${m}</div>`).join('');
+                    suggestionsEl.classList.remove('hidden');
                 } else {
                     suggestionsEl.classList.add('hidden');
                 }
-            });
+            } else {
+                suggestionsEl.classList.add('hidden');
+            }
+        });
 
-            input.addEventListener('keydown', (e) => {
-                if(e.key === 'Enter') {
-                    e.preventDefault();
-                    const val = e.target.value.trim();
-                    if(val && !currentFormTags.includes(val)) {
-                        currentFormTags.push(val);
-                    }
-                    e.target.value = '';
-                    renderFormTags();
-                    suggestionsEl.classList.add('hidden');
+        input.addEventListener('keydown', (e) => {
+            if(e.key === 'Enter') {
+                e.preventDefault();
+                const val = e.target.value.trim();
+                if(val && !currentFormTags.includes(val)) {
+                    currentFormTags.push(val);
                 }
-            });
+                e.target.value = '';
+                renderFormTags();
+                suggestionsEl.classList.add('hidden');
+            }
+        });
 
-            // Скрытие саджестов при клике вне
-            document.addEventListener('click', (e) => {
-                if(!input.contains(e.target) && !suggestionsEl.contains(e.target)) {
-                    suggestionsEl.classList.add('hidden');
-                }
-            });
-        }
+        document.addEventListener('click', (e) => {
+            if(!input.contains(e.target) && !suggestionsEl.contains(e.target)) {
+                suggestionsEl.classList.add('hidden');
+            }
+        });
+    }
 
-        function addTagToForm(tag) {
-            if(!currentFormTags.includes(tag)) currentFormTags.push(tag);
-            document.getElementById('exp-tags-input').value = '';
-            document.getElementById('form-tags-suggestions').classList.add('hidden');
-            renderFormTags();
-            document.getElementById('exp-tags-input').focus();
-        }
+    function addTagToForm(tag) {
+        if(!currentFormTags.includes(tag)) currentFormTags.push(tag);
+        document.getElementById('exp-tags-input').value = '';
+        document.getElementById('form-tags-suggestions').classList.add('hidden');
+        renderFormTags();
+        document.getElementById('exp-tags-input').focus();
+    }
 
-        function removeTagFromForm(tag) {
-            currentFormTags = currentFormTags.filter(t => t !== tag);
-            renderFormTags();
-        }
+    function removeTagFromForm(tag) {
+        currentFormTags = currentFormTags.filter(t => t !== tag);
+        renderFormTags();
+    }
 
-        function renderFormTags() {
-            const container = document.getElementById('form-tags-container');
-            container.innerHTML = currentFormTags.map(t => `
+    function renderFormTags() {
+        const container = document.getElementById('form-tags-container');
+        container.innerHTML = currentFormTags.map(t => `
                 <span class="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2 py-1 rounded flex items-center gap-1">
                     ${t} <button type="button" onclick="removeTagFromForm('${t.replace(/'/g, "\\'")}')" class="text-indigo-500 hover:text-indigo-700 font-bold ml-1">✕</button>
                 </span>
             `).join('');
-        }
+    }
 
-        // --- ЛОГИКА ДОБАВЛЕНИЯ/УДАЛЕНИЯ ДАННЫХ ---
-        async function addCategory(e) {
-            e.preventDefault();
-            const input = document.getElementById('new-category-name');
-            const newCat = input.value.trim();
-            if (!newCat || state.categories.some(c => c.toLowerCase() === newCat.toLowerCase())) return;
-            state.categories.push(newCat);
-            chartState.filters.add(newCat);
-            input.value = '';
+    // --- ЛОГИКА ДОБАВЛЕНИЯ/УДАЛЕНИЯ ДАННЫХ ---
+    async function addCategory(e) {
+        e.preventDefault();
+        const input = document.getElementById('new-category-name');
+        const newCat = input.value.trim();
+        if (!newCat || state.categories.some(c => c.toLowerCase() === newCat.toLowerCase())) return;
+        state.categories.push(newCat);
+        chartState.filters.add(newCat);
+        input.value = '';
+        updateUI(true);
+    }
+
+    async function deleteCategory(catName) {
+        if(confirm(`Удалить категорию "${catName}"? Связанные расходы будут перемещены в "Без категории".`)) {
+            state.categories = state.categories.filter(c => c !== catName);
+            state.expenses.forEach(exp => { if (exp.category === catName) exp.category = "Без категории"; });
+            if(!state.categories.includes("Без категории") && state.expenses.some(e => e.category === "Без категории")) state.categories.push("Без категории");
+            chartState.filters.delete(catName);
             updateUI(true);
         }
+    }
 
-        async function deleteCategory(catName) {
-            if(confirm(`Удалить категорию "${catName}"? Связанные расходы будут перемещены в "Без категории".`)) {
-                state.categories = state.categories.filter(c => c !== catName);
-                state.expenses.forEach(exp => { if (exp.category === catName) exp.category = "Без категории"; });
-                if(!state.categories.includes("Без категории") && state.expenses.some(e => e.category === "Без категории")) state.categories.push("Без категории");
-                chartState.filters.delete(catName);
-                updateUI(true);
+    async function addExpense(e) {
+        e.preventDefault();
+        currentFormTags.forEach(t => {
+            if(!state.tags.includes(t)) {
+                state.tags.push(t);
+                chartState.filters.add(t);
             }
-        }
+        });
 
-        async function addExpense(e) {
-            e.preventDefault();
-            // Добавляем новые теги из формы в глобальный state.tags
-            currentFormTags.forEach(t => {
+        state.expenses.push({
+            id: Date.now().toString(),
+            name: document.getElementById('exp-name').value.trim(),
+            category: document.getElementById('exp-category').value,
+            cost: parseFloat(document.getElementById('exp-cost').value),
+            link: document.getElementById('exp-link').value.trim(),
+            paid: document.getElementById('exp-paid').checked,
+            tags: [...currentFormTags],
+            notes: ''
+        });
+
+        document.getElementById('expense-form').reset();
+        currentFormTags = [];
+        renderFormTags();
+        updateUI(true);
+    }
+
+    async function deleteExpense(id) {
+        if(confirm('Точно удалить этот расход?')) {
+            state.expenses = state.expenses.filter(e => e.id !== id);
+            selectedForPayment.delete(id); // Удаляем из выбранных
+            updateUI(true);
+        }
+    }
+
+    // --- УНИВЕРСАЛЬНОЕ РЕДАКТИРОВАНИЕ ПОЛЕЙ ---
+    function startEdit(id, field) { editState = { id, field }; updateUI(false); }
+    function cancelEdit() { editState = { id: null, field: null }; updateUI(false); }
+
+    function saveEdit(id, field) {
+        const expIndex = state.expenses.findIndex(e => e.id === id);
+        if (expIndex === -1) return cancelEdit();
+        const exp = state.expenses[expIndex];
+
+        if (field === 'name') {
+            const val = document.getElementById(`edit-name-${id}`).value.trim();
+            if (!val) { alert('Название не может быть пустым'); return; }
+            exp.name = val;
+        } else if (field === 'link') {
+            exp.link = document.getElementById(`edit-link-${id}`).value.trim();
+        } else if (field === 'cost') {
+            const val = parseFloat(document.getElementById(`edit-cost-${id}`).value);
+            if (isNaN(val) || val < 0) { alert('Некорректная цена'); return; }
+            exp.cost = val;
+        } else if (field === 'paid') {
+            exp.paid = document.getElementById(`edit-paid-${id}`).checked;
+            if (exp.paid) selectedForPayment.delete(id); // Если оплачено, снимаем выбор на оплату
+        } else if (field === 'tags') {
+            const val = document.getElementById(`edit-tags-${id}`).value;
+            const newTags = val.split(',').map(t => t.trim()).filter(t => t);
+            exp.tags = [...new Set(newTags)];
+            exp.tags.forEach(t => {
                 if(!state.tags.includes(t)) {
                     state.tags.push(t);
-                    chartState.filters.add(t); // Сразу включаем в фильтры
+                    chartState.filters.add(t);
                 }
             });
+        }
 
-            state.expenses.push({
-                id: Date.now().toString(),
-                name: document.getElementById('exp-name').value.trim(),
-                category: document.getElementById('exp-category').value,
-                cost: parseFloat(document.getElementById('exp-cost').value),
-                link: document.getElementById('exp-link').value.trim(),
-                priority: document.getElementById('exp-priority').checked,
-                paid: document.getElementById('exp-paid').checked,
-                tags: [...currentFormTags],
-                notes: ''
-            });
+        editState = { id: null, field: null };
+        updateUI(true);
+    }
 
-            document.getElementById('expense-form').reset();
-            currentFormTags = [];
-            renderFormTags();
+    function toggleNotes(id) {
+        if(expandedNotes.has(id)) expandedNotes.delete(id);
+        else expandedNotes.add(id);
+        updateUI(false);
+    }
+
+    function saveNoteData(id) {
+        const expIndex = state.expenses.findIndex(e => e.id === id);
+        if (expIndex !== -1) {
+            state.expenses[expIndex].notes = document.getElementById(`note-text-${id}`).value;
             updateUI(true);
         }
+    }
 
-        async function deleteExpense(id) {
-            if(confirm('Точно удалить этот расход?')) {
-                state.expenses = state.expenses.filter(e => e.id !== id);
-                updateUI(true);
-            }
+    // --- ЛОГИКА ГРАФИКОВ И ФИЛЬТРОВ ---
+    function initChartFilters() {
+        chartState.filters.clear();
+        state.categories.forEach(c => chartState.filters.add(c));
+        state.tags.forEach(t => chartState.filters.add(t));
+    }
+
+    function switchChartTab(tab) {
+        chartState.activeTab = tab;
+        document.getElementById('tab-btn-categories').className = tab === 'categories'
+            ? 'px-2 py-2 font-bold text-indigo-600 border-b-2 border-indigo-600 transition'
+            : 'px-2 py-2 font-medium text-slate-500 hover:text-slate-800 transition';
+        document.getElementById('tab-btn-tags').className = tab === 'tags'
+            ? 'px-2 py-2 font-bold text-indigo-600 border-b-2 border-indigo-600 transition'
+            : 'px-2 py-2 font-medium text-slate-500 hover:text-slate-800 transition';
+        renderChartFilters();
+        renderChart();
+    }
+
+    function toggleFilter(item) {
+        if(chartState.filters.has(item)) chartState.filters.delete(item);
+        else chartState.filters.add(item);
+        renderChartFilters();
+        renderChart();
+    }
+
+    function toggleAllFilters() {
+        const items = chartState.activeTab === 'categories' ? state.categories : state.tags;
+        const allChecked = items.every(i => chartState.filters.has(i));
+        if (allChecked) {
+            items.forEach(i => chartState.filters.delete(i));
+        } else {
+            items.forEach(i => chartState.filters.add(i));
+        }
+        renderChartFilters();
+        renderChart();
+    }
+
+    function renderChartFilters() {
+        const container = document.getElementById('chart-filters-list');
+        const items = chartState.activeTab === 'categories' ? state.categories : state.tags;
+
+        if(items.length === 0) {
+            container.innerHTML = '<p class="text-sm text-slate-400 italic">Нет данных</p>';
+            return;
         }
 
-        // --- УНИВЕРСАЛЬНОЕ РЕДАКТИРОВАНИЕ ПОЛЕЙ ---
-        function startEdit(id, field) { editState = { id, field }; updateUI(false); }
-        function cancelEdit() { editState = { id: null, field: null }; updateUI(false); }
-
-        function saveEdit(id, field) {
-            const expIndex = state.expenses.findIndex(e => e.id === id);
-            if (expIndex === -1) return cancelEdit();
-            const exp = state.expenses[expIndex];
-
-            if (field === 'name') {
-                const val = document.getElementById(`edit-name-${id}`).value.trim();
-                if (!val) { alert('Название не может быть пустым'); return; }
-                exp.name = val;
-            } else if (field === 'link') {
-                exp.link = document.getElementById(`edit-link-${id}`).value.trim();
-            } else if (field === 'cost') {
-                const val = parseFloat(document.getElementById(`edit-cost-${id}`).value);
-                if (isNaN(val) || val < 0) { alert('Некорректная цена'); return; }
-                exp.cost = val;
-            } else if (field === 'priority') {
-                exp.priority = document.getElementById(`edit-priority-${id}`).checked;
-            } else if (field === 'paid') {
-                exp.paid = document.getElementById(`edit-paid-${id}`).checked;
-            } else if (field === 'tags') {
-                const val = document.getElementById(`edit-tags-${id}`).value;
-                const newTags = val.split(',').map(t => t.trim()).filter(t => t);
-                exp.tags = [...new Set(newTags)];
-                // Обновляем глобальный справочник тегов
-                exp.tags.forEach(t => {
-                    if(!state.tags.includes(t)) {
-                        state.tags.push(t);
-                        chartState.filters.add(t);
-                    }
-                });
-            }
-
-            editState = { id: null, field: null };
-            updateUI(true); 
-        }
-
-        function toggleNotes(id) {
-            if(expandedNotes.has(id)) expandedNotes.delete(id);
-            else expandedNotes.add(id);
-            updateUI(false);
-        }
-
-        function saveNoteData(id) {
-            const expIndex = state.expenses.findIndex(e => e.id === id);
-            if (expIndex !== -1) {
-                state.expenses[expIndex].notes = document.getElementById(`note-text-${id}`).value;
-                updateUI(true);
-            }
-        }
-
-        // --- ЛОГИКА ГРАФИКОВ И ФИЛЬТРОВ ---
-        function initChartFilters() {
-            chartState.filters.clear();
-            state.categories.forEach(c => chartState.filters.add(c));
-            state.tags.forEach(t => chartState.filters.add(t));
-        }
-
-        function switchChartTab(tab) {
-            chartState.activeTab = tab;
-            document.getElementById('tab-btn-categories').className = tab === 'categories' 
-                ? 'px-2 py-2 font-bold text-indigo-600 border-b-2 border-indigo-600 transition' 
-                : 'px-2 py-2 font-medium text-slate-500 hover:text-slate-800 transition';
-            document.getElementById('tab-btn-tags').className = tab === 'tags' 
-                ? 'px-2 py-2 font-bold text-indigo-600 border-b-2 border-indigo-600 transition' 
-                : 'px-2 py-2 font-medium text-slate-500 hover:text-slate-800 transition';
-            renderChartFilters();
-            renderChart();
-        }
-
-        function toggleFilter(item) {
-            if(chartState.filters.has(item)) chartState.filters.delete(item);
-            else chartState.filters.add(item);
-            renderChartFilters();
-            renderChart();
-        }
-
-        function toggleAllFilters() {
-            const items = chartState.activeTab === 'categories' ? state.categories : state.tags;
-            const allChecked = items.every(i => chartState.filters.has(i));
-            if (allChecked) {
-                items.forEach(i => chartState.filters.delete(i));
-            } else {
-                items.forEach(i => chartState.filters.add(i));
-            }
-            renderChartFilters();
-            renderChart();
-        }
-
-        function renderChartFilters() {
-            const container = document.getElementById('chart-filters-list');
-            const items = chartState.activeTab === 'categories' ? state.categories : state.tags;
-            
-            if(items.length === 0) {
-                container.innerHTML = '<p class="text-sm text-slate-400 italic">Нет данных</p>';
-                return;
-            }
-
-            container.innerHTML = items.map(item => `
+        container.innerHTML = items.map(item => `
                 <label class="flex items-center gap-2 cursor-pointer p-1 hover:bg-slate-50 rounded transition">
                     <input type="checkbox" onchange="toggleFilter('${item.replace(/'/g, "\\'")}')" ${chartState.filters.has(item) ? 'checked' : ''} class="w-4 h-4 text-indigo-600 rounded">
                     <span class="text-sm text-slate-700 truncate w-full" title="${item}">${item}</span>
                 </label>
             `).join('');
-        }
+    }
 
-        function renderChart() {
-            if (!isChartVisible) return;
-            const ctx = document.getElementById('expenseChart').getContext('2d');
-            
-            const dataMap = {};
-            
-            if (chartState.activeTab === 'categories') {
-                state.expenses.forEach(exp => {
-                    if (chartState.filters.has(exp.category)) {
-                        dataMap[exp.category] = (dataMap[exp.category] || 0) + exp.cost;
-                    }
-                });
-            } else {
-                state.expenses.forEach(exp => {
-                    if (exp.tags && exp.tags.length > 0) {
-                        exp.tags.forEach(t => {
-                            if (chartState.filters.has(t)) {
-                                dataMap[t] = (dataMap[t] || 0) + exp.cost;
-                            }
-                        });
-                    } else if (chartState.filters.has('Без меток')) {
-                        // Для графика по тегам, если тегов нет
-                        dataMap['Без меток'] = (dataMap['Без меток'] || 0) + exp.cost;
-                    }
-                });
-            }
+    function renderChart() {
+        if (!isChartVisible) return;
+        const ctx = document.getElementById('expenseChart').getContext('2d');
 
-            const labels = Object.keys(dataMap);
-            const data = Object.values(dataMap);
+        const dataMap = {};
 
-            if (chartInstance) chartInstance.destroy();
-            
-            if(data.length === 0) {
-                // Очистка если нет данных
-                chartInstance = new Chart(ctx, { type: 'doughnut', data: { labels: [], datasets: [] } });
-                return;
-            }
-
-            chartInstance = new Chart(ctx, {
-                type: 'doughnut',
-                data: { 
-                    labels: labels, 
-                    datasets: [{ 
-                        data: data, 
-                        backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316', '#84cc16', '#14b8a6', '#64748b'] 
-                    }] 
-                },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false,
-                    cutout: '60%', 
-                    plugins: { 
-                        legend: { position: 'right', labels: { boxWidth: 12, padding: 10, font: {size: 11} } } 
-                    } 
+        if (chartState.activeTab === 'categories') {
+            state.expenses.forEach(exp => {
+                if (chartState.filters.has(exp.category)) {
+                    dataMap[exp.category] = (dataMap[exp.category] || 0) + exp.cost;
+                }
+            });
+        } else {
+            state.expenses.forEach(exp => {
+                if (exp.tags && exp.tags.length > 0) {
+                    exp.tags.forEach(t => {
+                        if (chartState.filters.has(t)) {
+                            dataMap[t] = (dataMap[t] || 0) + exp.cost;
+                        }
+                    });
+                } else if (chartState.filters.has('Без меток')) {
+                    dataMap['Без меток'] = (dataMap['Без меток'] || 0) + exp.cost;
                 }
             });
         }
 
+        const labels = Object.keys(dataMap);
+        const data = Object.values(dataMap);
 
-        // --- РЕНДЕР ТАБЛИЦЫ ---
-        function renderCategories() {
-            document.getElementById('categories-list').innerHTML = state.categories.map(cat => `
+        if (chartInstance) chartInstance.destroy();
+
+        if(data.length === 0) {
+            chartInstance = new Chart(ctx, { type: 'doughnut', data: { labels: [], datasets: [] } });
+            return;
+        }
+
+        chartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316', '#84cc16', '#14b8a6', '#64748b']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '60%',
+                plugins: {
+                    legend: { position: 'right', labels: { boxWidth: 12, padding: 10, font: {size: 11} } }
+                }
+            }
+        });
+    }
+
+    // --- РЕНДЕР ТАБЛИЦЫ ---
+    function renderCategories() {
+        document.getElementById('categories-list').innerHTML = state.categories.map(cat => `
                 <li class="flex flex-col sm:flex-row justify-between sm:items-center p-3 hover:bg-slate-100 transition gap-2">
                     <span class="font-medium truncate">${cat}</span>
                     <button type="button" onclick="deleteCategory('${cat}')" class="text-red-500 hover:text-red-700 text-sm font-semibold bg-red-50 sm:bg-transparent px-2 py-1 sm:p-0 rounded">Удалить</button>
                 </li>
             `).join('');
-        }
+    }
 
-        function renderCategorySelect() {
-            document.getElementById('exp-category').innerHTML = state.categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
-        }
+    function renderCategorySelect() {
+        document.getElementById('exp-category').innerHTML = state.categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+    }
 
-        function renderExpensesTable() {
-            const tbody = document.getElementById('expenses-table-body');
-            document.getElementById('empty-state').classList.toggle('hidden', state.expenses.length > 0);
-            tbody.innerHTML = '';
-            
-            let totalPaid = 0, totalUnpaid = 0;
-            const grouped = {};
-            state.categories.forEach(c => grouped[c] = []); 
-            state.expenses.forEach(exp => {
-                if (!grouped[exp.category]) { grouped[exp.category] = []; state.categories.push(exp.category); }
-                grouped[exp.category].push(exp);
+    function renderExpensesTable() {
+        const tbody = document.getElementById('expenses-table-body');
+        document.getElementById('empty-state').classList.toggle('hidden', state.expenses.length > 0);
+        tbody.innerHTML = '';
+
+        let totalPaid = 0, totalUnpaid = 0;
+        const grouped = {};
+        state.categories.forEach(c => grouped[c] = []);
+        state.expenses.forEach(exp => {
+            if (!grouped[exp.category]) { grouped[exp.category] = []; state.categories.push(exp.category); }
+            grouped[exp.category].push(exp);
+        });
+
+        state.categories.forEach(cat => {
+            if (!grouped[cat] || grouped[cat].length === 0) return;
+
+            // Вычисляем суммы по текущей категории
+            let catPaid = 0;
+            let catUnpaid = 0;
+            grouped[cat].forEach(exp => {
+                if (exp.paid) catPaid += exp.cost;
+                else catUnpaid += exp.cost;
             });
 
-            state.categories.forEach(cat => {
-                if (!grouped[cat] || grouped[cat].length === 0) return;
-                tbody.innerHTML += `<tr class="bg-indigo-50"><td colspan="8" class="p-3 sm:p-4 font-bold text-indigo-900">${cat}</td></tr>`;
+            // Заголовок категории с суммами
+            tbody.innerHTML += `
+                <tr class="bg-indigo-50 border-y border-indigo-100">
+                    <td colspan="7" class="p-3 sm:p-4 font-bold text-indigo-900">
+                        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                            <span class="text-base uppercase tracking-wider">${cat}</span>
+                            <span class="text-sm font-medium text-indigo-700 bg-indigo-100/50 px-3 py-1.5 rounded-md">
+                                Оплачено: <span class="font-bold">${catPaid.toLocaleString('ru-RU')} $</span>
+                                <span class="mx-2 text-indigo-300">|</span>
+                                Осталось: <span class="font-bold">${catUnpaid.toLocaleString('ru-RU')} $</span>
+                            </span>
+                        </div>
+                    </td>
+                </tr>
+            `;
 
-                grouped[cat].forEach(exp => {
-                    exp.paid ? (totalPaid += exp.cost) : (totalUnpaid += exp.cost);
+            grouped[cat].forEach(exp => {
+                exp.paid ? (totalPaid += exp.cost) : (totalUnpaid += exp.cost);
 
-                    // 1. Название
-                    let nameHtml = editState.id === exp.id && editState.field === 'name' 
-                        ? `<div class="flex items-center gap-1"><input type="text" id="edit-name-${exp.id}" value="${exp.name.replace(/"/g, '&quot;')}" class="w-full border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none"><button onclick="saveEdit('${exp.id}', 'name')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`
-                        : `<div onclick="startEdit('${exp.id}', 'name')" class="cursor-pointer group flex items-center gap-2 hover:bg-indigo-50 p-1 -ml-1 rounded transition"><span class="border-b border-dashed border-slate-400 group-hover:border-indigo-600">${exp.name}</span><span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
+                // Чекбокс выбора на оплату
+                let payCheckboxHtml = !exp.paid
+                    ? `<input type="checkbox" onclick="event.stopPropagation()" onchange="togglePaymentSelection('${exp.id}', this.checked)" ${selectedForPayment.has(exp.id) ? 'checked' : ''} class="w-4 h-4 mt-1 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer shrink-0" title="Добавить к оплате">`
+                    : `<div class="w-4 h-4 mt-1 shrink-0"></div>`; // пустой блок для сохранения выравнивания
 
-                    // 2. Ссылка
-                    let linkHtml = editState.id === exp.id && editState.field === 'link'
-                        ? `<div class="flex items-center gap-1 justify-center relative z-10"><input type="url" id="edit-link-${exp.id}" value="${exp.link ? exp.link.replace(/"/g, '&quot;') : ''}" placeholder="https://" class="w-20 border border-indigo-400 rounded px-1 py-1 text-xs focus:outline-none"><button onclick="saveEdit('${exp.id}', 'link')" class="bg-emerald-500 text-white px-1 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-1 py-1 rounded text-xs font-bold">✕</button></div>`
-                        : `<div onclick="startEdit('${exp.id}', 'link')" class="cursor-pointer group flex items-center justify-center gap-1 hover:bg-indigo-50 p-1 rounded transition">${exp.link ? `<a href="${exp.link}" target="_blank" onclick="event.stopPropagation()" class="text-blue-500 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-full text-xs font-semibold">🔗</a>` : `<span class="text-slate-300">—</span>`}<span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
+                // 1. Название + Чекбокс
+                let nameInnerHtml = editState.id === exp.id && editState.field === 'name'
+                    ? `<div class="flex items-center gap-1"><input type="text" id="edit-name-${exp.id}" value="${exp.name.replace(/"/g, '&quot;')}" class="w-full border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none"><button onclick="saveEdit('${exp.id}', 'name')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`
+                    : `<div onclick="startEdit('${exp.id}', 'name')" class="cursor-pointer group flex items-center gap-2 hover:bg-indigo-50 p-1 rounded transition w-full"><span class="border-b border-dashed border-slate-400 group-hover:border-indigo-600 break-words">${exp.name}</span><span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400 shrink-0">✏️</span></div>`;
 
-                    // 3. Цена
-                    let costHtml = editState.id === exp.id && editState.field === 'cost'
-                        ? `<div class="flex items-center gap-1"><input type="number" id="edit-cost-${exp.id}" value="${exp.cost}" step="0.01" min="0" class="w-20 border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none"><button onclick="saveEdit('${exp.id}', 'cost')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`
-                        : `<div onclick="startEdit('${exp.id}', 'cost')" class="cursor-pointer group flex items-center gap-2 hover:bg-indigo-50 p-1 -ml-1 rounded transition"><span class="border-b border-dashed border-slate-400 group-hover:border-indigo-600 font-bold">${exp.cost.toLocaleString('ru-RU')} ₽</span><span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
+                let nameHtml = `
+                    <div class="flex items-start gap-2 sm:gap-3">
+                        ${payCheckboxHtml}
+                        <div class="min-w-0 flex-grow">${nameInnerHtml}</div>
+                    </div>
+                `;
 
-                    // 4. Метки (Теги)
-                    let tagsListStr = exp.tags && exp.tags.length > 0 
-                        ? exp.tags.map(t => `<span class="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded">${t}</span>`).join(' ') 
-                        : `<span class="text-slate-300">—</span>`;
-                    
-                    let tagsHtml = editState.id === exp.id && editState.field === 'tags'
-                        ? `<div class="flex items-center gap-1 relative z-10"><input type="text" id="edit-tags-${exp.id}" value="${(exp.tags || []).join(', ')}" placeholder="через запятую" class="w-full border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none"><button onclick="saveEdit('${exp.id}', 'tags')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`
-                        : `<div onclick="startEdit('${exp.id}', 'tags')" class="cursor-pointer group flex flex-wrap items-center gap-1 hover:bg-indigo-50 p-1 -ml-1 rounded transition">${tagsListStr}<span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400 ml-1">✏️</span></div>`;
+                // 2. Ссылка
+                let linkHtml = editState.id === exp.id && editState.field === 'link'
+                    ? `<div class="flex items-center gap-1 justify-center relative z-10"><input type="url" id="edit-link-${exp.id}" value="${exp.link ? exp.link.replace(/"/g, '&quot;') : ''}" placeholder="https://" class="w-20 border border-indigo-400 rounded px-1 py-1 text-xs focus:outline-none"><button onclick="saveEdit('${exp.id}', 'link')" class="bg-emerald-500 text-white px-1 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-1 py-1 rounded text-xs font-bold">✕</button></div>`
+                    : `<div onclick="startEdit('${exp.id}', 'link')" class="cursor-pointer group flex items-center justify-center gap-1 hover:bg-indigo-50 p-1 rounded transition">${exp.link ? `<a href="${exp.link}" target="_blank" onclick="event.stopPropagation()" class="text-blue-500 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-full text-xs font-semibold">🔗</a>` : `<span class="text-slate-300">—</span>`}<span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
 
-                    // 5. Приоритет
-                    let priorityHtml = editState.id === exp.id && editState.field === 'priority'
-                        ? `<div class="flex items-center justify-center gap-1 bg-white border border-indigo-200 p-1 rounded relative z-10"><input type="checkbox" id="edit-priority-${exp.id}" ${exp.priority ? 'checked' : ''} class="w-4 h-4 text-indigo-600 rounded"><button onclick="saveEdit('${exp.id}', 'priority')" class="bg-emerald-500 text-white px-1 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-1 py-1 rounded text-xs font-bold">✕</button></div>`
-                        : `<div onclick="startEdit('${exp.id}', 'priority')" class="cursor-pointer group flex items-center justify-center gap-1 hover:bg-indigo-50 p-1 rounded transition">${exp.priority ? '<span title="Высокий приоритет">🔥</span>' : '<span class="text-slate-300">—</span>'}<span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
+                // 3. Цена
+                let costHtml = editState.id === exp.id && editState.field === 'cost'
+                    ? `<div class="flex items-center gap-1"><input type="number" id="edit-cost-${exp.id}" value="${exp.cost}" step="0.01" min="0" class="w-20 border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none"><button onclick="saveEdit('${exp.id}', 'cost')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`
+                    : `<div onclick="startEdit('${exp.id}', 'cost')" class="cursor-pointer group flex items-center gap-2 hover:bg-indigo-50 p-1 -ml-1 rounded transition"><span class="border-b border-dashed border-slate-400 group-hover:border-indigo-600 font-bold">${exp.cost.toLocaleString('ru-RU')} $</span><span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
 
-                    // 6. Статус
-                    let paidHtml = editState.id === exp.id && editState.field === 'paid'
-                        ? `<div class="flex items-center justify-center gap-1 bg-white border border-indigo-200 p-1 rounded relative z-10"><input type="checkbox" id="edit-paid-${exp.id}" ${exp.paid ? 'checked' : ''} class="w-4 h-4 text-emerald-600 rounded"><button onclick="saveEdit('${exp.id}', 'paid')" class="bg-emerald-500 text-white px-1 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-1 py-1 rounded text-xs font-bold">✕</button></div>`
-                        : `<div onclick="startEdit('${exp.id}', 'paid')" class="cursor-pointer group flex items-center justify-center gap-1 hover:bg-indigo-50 p-1 rounded transition">${exp.paid ? '<span class="text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-1 rounded-full border-b border-dashed border-emerald-400">Оплачено</span>' : '<span class="text-slate-400 text-xs border-b border-dashed border-slate-300">В плане</span>'}<span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
+                // 4. Метки (Теги)
+                let tagsListStr = exp.tags && exp.tags.length > 0
+                    ? exp.tags.map(t => `<span class="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded">${t}</span>`).join(' ')
+                    : `<span class="text-slate-300">—</span>`;
 
-                    // 7. Заметки (Кнопка)
-                    let noteIndicator = exp.notes && exp.notes.trim() !== '' ? '📝 ' : '';
-                    let notesBtn = `<button onclick="toggleNotes('${exp.id}')" class="text-xs font-semibold px-2 py-1 rounded transition ${expandedNotes.has(exp.id) ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">${noteIndicator}${expandedNotes.has(exp.id) ? 'Свернуть' : 'Развернуть'}</button>`;
+                let tagsHtml = editState.id === exp.id && editState.field === 'tags'
+                    ? `<div class="flex items-center gap-1 relative z-10"><input type="text" id="edit-tags-${exp.id}" value="${(exp.tags || []).join(', ')}" placeholder="через запятую" class="w-full border border-indigo-400 rounded px-2 py-1 text-sm focus:outline-none"><button onclick="saveEdit('${exp.id}', 'tags')" class="bg-emerald-500 text-white px-2 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-2 py-1 rounded text-xs font-bold">✕</button></div>`
+                    : `<div onclick="startEdit('${exp.id}', 'tags')" class="cursor-pointer group flex flex-wrap items-center gap-1 hover:bg-indigo-50 p-1 -ml-1 rounded transition">${tagsListStr}<span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400 ml-1">✏️</span></div>`;
 
-                    // Отрисовка основной строки
-                    tbody.innerHTML += `
+                // 6. Статус
+                let paidHtml = editState.id === exp.id && editState.field === 'paid'
+                    ? `<div class="flex items-center justify-center gap-1 bg-white border border-indigo-200 p-1 rounded relative z-10"><input type="checkbox" id="edit-paid-${exp.id}" ${exp.paid ? 'checked' : ''} class="w-4 h-4 text-emerald-600 rounded"><button onclick="saveEdit('${exp.id}', 'paid')" class="bg-emerald-500 text-white px-1 py-1 rounded text-xs font-bold">OK</button><button onclick="cancelEdit()" class="bg-slate-200 text-slate-600 px-1 py-1 rounded text-xs font-bold">✕</button></div>`
+                    : `<div onclick="startEdit('${exp.id}', 'paid')" class="cursor-pointer group flex items-center justify-center gap-1 hover:bg-indigo-50 p-1 rounded transition">${exp.paid ? '<span class="text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-1 rounded-full border-b border-dashed border-emerald-400">Оплачено</span>' : '<span class="text-slate-400 text-xs border-b border-dashed border-slate-300">В плане</span>'}<span class="opacity-0 group-hover:opacity-100 text-xs text-indigo-400">✏️</span></div>`;
+
+                // 7. Заметки (Кнопка)
+                let noteIndicator = exp.notes && exp.notes.trim() !== '' ? '📝 ' : '';
+                let notesBtn = `<button onclick="toggleNotes('${exp.id}')" class="text-xs font-semibold px-2 py-1 rounded transition ${expandedNotes.has(exp.id) ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">${noteIndicator}${expandedNotes.has(exp.id) ? 'Свернуть' : 'Развернуть'}</button>`;
+
+                // Отрисовка основной строки
+                tbody.innerHTML += `
                         <tr class="hover:bg-slate-50 border-t border-slate-100 transition-colors">
                             <td class="p-3">${nameHtml}</td>
                             <td class="p-3 text-center">${linkHtml}</td>
                             <td class="p-3 whitespace-nowrap">${costHtml}</td>
                             <td class="p-3">${tagsHtml}</td>
-                            <td class="p-3 text-center">${priorityHtml}</td>
                             <td class="p-3 text-center">${paidHtml}</td>
                             <td class="p-3 text-center">${notesBtn}</td>
                             <td class="p-3 text-right">
@@ -654,11 +771,11 @@
                         </tr>
                     `;
 
-                    // Отрисовка подстроки с заметками
-                    if (expandedNotes.has(exp.id)) {
-                        tbody.innerHTML += `
+                // Отрисовка подстроки с заметками
+                if (expandedNotes.has(exp.id)) {
+                    tbody.innerHTML += `
                             <tr class="bg-indigo-50/30 border-b border-indigo-100">
-                                <td colspan="8" class="p-3 pl-6 pr-6">
+                                <td colspan="7" class="p-3 pl-6 pr-6">
                                     <div class="flex flex-col gap-2">
                                         <label class="text-xs font-semibold text-indigo-800 uppercase tracking-wider">Заметки к статье:</label>
                                         <textarea id="note-text-${exp.id}" rows="2" class="w-full border border-indigo-200 rounded p-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" placeholder="Укажите любые детали, размеры, контакты подрядчика...">${exp.notes || ''}</textarea>
@@ -669,12 +786,12 @@
                                 </td>
                             </tr>
                         `;
-                    }
-                });
+                }
             });
-            document.getElementById('grand-total-paid').textContent = totalPaid.toLocaleString('ru-RU');
-            document.getElementById('grand-total-unpaid').textContent = totalUnpaid.toLocaleString('ru-RU');
-        }
-    </script>
+        });
+        document.getElementById('grand-total-paid').textContent = totalPaid.toLocaleString('ru-RU');
+        document.getElementById('grand-total-unpaid').textContent = totalUnpaid.toLocaleString('ru-RU');
+    }
+</script>
 </body>
 </html>
